@@ -1,5 +1,5 @@
 {
-  "_comment": "Counters, student register and activity written by the Mathematics Advanced subject cloud. Read by the site; sensitive only in that it lists issued usernames and passwords.",
+  "_comment": "Optional cloud snapshot. This file is public in a public repository and can contain student names, usernames, plaintext passwords and activity logs. Do not sync sensitive student data here.",
   "subject": "Mathematics Advanced",
   "updatedAt": "2026-10-03T13:07:24.341Z",
   "counters": {

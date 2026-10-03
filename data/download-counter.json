@@ -1,0 +1,4 @@
+{
+  "_comment": "Public configuration only. Set endpoint to the deployed Cloudflare Worker URL; never put secrets or GitHub tokens here.",
+  "endpoint": ""
+}
