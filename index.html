@@ -11,7 +11,7 @@
 <!-- Static, single-file deployment. Everything the page needs is inline, so the
      only external hosts allowed are the ones used for cloud publishing,
      file previews and Office/PDF rendering. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com https://cdn.jsdelivr.net; font-src 'self' data:; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://cdn.jsdelivr.net https://*.workers.dev data: blob:; frame-src 'self' blob: data: https://raw.githubusercontent.com https://cdn.jsdelivr.net https://view.officeapps.live.com https://mozilla.github.io https://docs.google.com; worker-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com https://cdn.jsdelivr.net; font-src 'self' data:; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://cdn.jsdelivr.net https://*.supabase.co data: blob:; frame-src 'self' blob: data: https://raw.githubusercontent.com https://cdn.jsdelivr.net https://view.officeapps.live.com https://mozilla.github.io https://docs.google.com; worker-src 'none'; form-action 'none'">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='16' y='23' font-family='Segoe UI,Arial' font-size='17' font-weight='700' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
 
 <style>
@@ -1533,7 +1533,7 @@ table.data th.num{text-align:right}
         <div class="notice notice--warn mb-6">
           <svg class="ico ico--sm" aria-hidden="true"><use href="#i-shield-check"/></svg>
           <div>
-            <b>Static-site limit:</b> registrations and visitor counts created in a browser stay on that device. The optional Cloudflare download-counter API combines downloads without exposing a GitHub token; deploy it and configure its public URL below. A GitHub token saved here only publishes files and does not give other visitors write access. Shared student registration and global visitor counts still need their own backend.
+            <b>How sharing works:</b> a browser can never write to GitHub by itself, so it talks to the shared Supabase backend below using the publishable key — that makes registration, sign-in, the visitor counter and the download counter identical on every device. A GitHub Action then mirrors the shared register into <code>data/cloud-data.json</code>, so the repository holds the class list too. The GitHub token saved here only publishes files; it is never shared with visitors.
           </div>
         </div>
 
@@ -1621,7 +1621,7 @@ table.data th.num{text-align:right}
               <div class="field">
                 <label for="datadir-input">Data folder</label>
                 <input class="input" id="datadir-input" type="text" placeholder="data" autocomplete="off" spellcheck="false">
-                <p class="hint">Holds <code>cloud-data.json</code>. In a public repository, anyone can read its counters, student details and activity logs.</p>
+                <p class="hint">Holds <code>sync-config.json</code> (the public Supabase URL and key) and <code>cloud-data.json</code> (the register mirror). In a public repository anyone can read them.</p>
               </div>
             </div>
             <div class="row row--wrap">
@@ -1638,30 +1638,42 @@ table.data th.num{text-align:right}
           </div>
         </section>
 
-        <!-- Shared download counter API -->
-        <section class="panel mb-6" aria-labelledby="counter-api-heading">
+        <!-- Shared backend (Supabase) -->
+        <section class="panel mb-6" aria-labelledby="sync-heading">
           <div class="panel__head">
             <div>
-              <h3 id="counter-api-heading">Shared download counter</h3>
-              <p>Connect the Cloudflare Worker + D1 service so successful downloads count across browsers.</p>
+              <h3 id="sync-heading">Shared cloud sync <span class="tag tag--emerald">Supabase</span></h3>
+              <p>Share student registration, sign-in, the visitor counter and the download counter across every device.</p>
             </div>
-            <span class="tag" id="download-counter-status">Not configured</span>
+            <span class="tag" id="sync-status">Not configured</span>
           </div>
           <div class="panel__body">
-            <div class="field">
-              <label for="download-counter-endpoint">Cloudflare Worker URL</label>
-              <input class="input" id="download-counter-endpoint" type="url" inputmode="url" placeholder="https://madv-download-counter.example.workers.dev" autocomplete="off" spellcheck="false">
-              <p class="hint">This URL is public, not a secret. Saving it writes only the endpoint to <code>data/download-counter.json</code>, which all browsers can read. The API receives a resource key and one-time event ID—never the GitHub token or student details.</p>
+            <div class="field-row">
+              <div class="field">
+                <label for="sync-url">Supabase project URL</label>
+                <input class="input" id="sync-url" type="url" inputmode="url" placeholder="https://abcdefghijklmnop.supabase.co" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="field">
+                <label for="sync-key">Publishable key</label>
+                <input class="input" id="sync-key" type="password" autocomplete="off" spellcheck="false" placeholder="sb_publishable_…">
+              </div>
             </div>
-            <div class="row row--wrap">
-              <button type="button" class="btn btn--dark" data-action="save-counter-api">
-                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-save"/></svg> Save endpoint to GitHub
+            <p class="hint">Only the <b>publishable</b> key (<code>sb_publishable_…</code> or the legacy anon JWT) belongs here — it is designed to be public because Row Level Security blocks direct table access and only the <code>madv_*</code> functions are exposed. Never paste a <code>sb_secret_…</code> key or a GitHub token. Saving writes just the URL and key to <code>data/sync-config.json</code>, so every device connects automatically.</p>
+            <label class="switch mt-3"><input type="checkbox" id="opt-sync-enabled"><span class="switch__track"></span> Use the shared backend on this device (register, sign in and count from anywhere)</label>
+            <label class="switch"><input type="checkbox" id="opt-sync-roster"><span class="switch__track"></span> Let the repository mirror keep student names and usernames (never passwords)</label>
+            <div class="row row--wrap mt-3">
+              <button type="button" class="btn btn--dark" data-action="save-sync">
+                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-save"/></svg> Save to GitHub
               </button>
-              <button type="button" class="btn btn--outline" data-action="sync-counter-api">
-                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-refresh"/></svg> Test / refresh shared totals
+              <button type="button" class="btn btn--outline" data-action="test-sync">
+                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-activity"/></svg> Test connection
+              </button>
+              <button type="button" class="btn btn--outline" data-action="sync-now">
+                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-refresh"/></svg> Sync now
               </button>
             </div>
-            <p class="field-error mt-3" id="download-counter-error" hidden role="alert"></p>
+            <p class="field-error mt-3" id="sync-error" hidden role="alert"></p>
+            <p class="hint mt-3" id="sync-hint"></p>
           </div>
         </section>
 
@@ -1676,8 +1688,8 @@ table.data th.num{text-align:right}
           <div class="panel__body stack">
             <label class="switch"><input type="checkbox" id="opt-cloud-sync"><span class="switch__track"></span> Pull the shared library and counters from the cloud on every visit</label>
             <label class="switch"><input type="checkbox" id="opt-push-analytics"><span class="switch__track"></span> Push this browser's student records and counters to GitHub after changes</label>
-            <div class="notice notice--warn"><div><b>Privacy warning:</b> the current repository is public. <code>cloud-data.json</code> includes student names, usernames, passwords and activity logs; enabling this writes them in plaintext where anyone can read them. Leave this off for student data. A server-side backend is required for private shared registration.</div></div>
-            <label class="switch"><input type="checkbox" id="opt-open-registration"><span class="switch__track"></span> Allow students to register themselves (in this browser only)</label>
+            <div class="notice notice--warn"><div><b>Privacy warning:</b> the current repository is public. When this mirror is on, <code>cloud-data.json</code> includes student names, usernames and activity counts — never passwords, which stay in the shared backend. Anyone online can read the names; switch it off to publish counters only.</div></div>
+            <label class="switch"><input type="checkbox" id="opt-open-registration"><span class="switch__track"></span> Allow students to register themselves</label>
             <label class="switch"><input type="checkbox" id="opt-require-login"><span class="switch__track"></span> Only signed-in students may download files</label>
             <label class="switch"><input type="checkbox" id="opt-blocked-copy"><span class="switch__track"></span> Show a "blocked" message to students whose access the admin removed</label>
             <div class="field-row">
@@ -1736,7 +1748,7 @@ table.data th.num{text-align:right}
                 <svg class="ico ico--sm" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Restore defaults (peter82 / petgabs82)
               </button>
             </div>
-            <p class="hint mt-2">Changing these affects this browser only, because the site is a single static HTML file with no server.</p>
+            <p class="hint mt-2">Changing these affects this browser and the gate on the shared register export. If you change them, store the same values as <code>ADMIN_USER</code> / <code>ADMIN_PASS</code> repository secrets so the scheduled workflow can still read the register.</p>
           </div>
         </section>
 
@@ -1884,7 +1896,8 @@ var KEYS = {
   device: 'madv.device.v2',
   tree: 'madv.tree.v2',
   token: 'madv.token.v2',
-  pendingDownloads: 'madv.pending-downloads.v1'
+  pendingSync: 'madv.pending-sync.v1',
+  syncConfig: 'madv.sync-config.v1'
 };
 var DEFAULT_SETTINGS = {
   repo: '',
@@ -1894,6 +1907,9 @@ var DEFAULT_SETTINGS = {
   cloudSync: true,
   // Student records include credentials and must not be published to a public repo by default.
   pushAnalytics: false,
+  // Shared backend (Supabase) — see backends/supabase/schema.sql
+  syncEnabled: true,
+  syncRosterInRepo: true,
   openRegistration: true,
   requireLogin: false,
   showBlockedMessage: true,
@@ -1966,7 +1982,8 @@ var state = {
   session: store.get(KEYS.session, null),
   cloud: { repo: '', branch: 'main', token: '', sessionOnly: false, librarySha: null, dataSha: null,
            lastSync: null, online: true, error: '', checked: false, login: '' },
-  counterApi: { endpoint: '', loaded: false, loading: null, lastSync: null, error: '' },
+  sync: { provider: 'supabase', url: '', key: '', loaded: false, loading: null, status: 'off',
+          lastSync: null, rosterAt: null, error: '', pending: 0, flushing: false, fromRepo: false },
   filters: { query: '', year: '', topic: '', category: '', kind: '', sort: 'newest' },
   studentsFilter: { query: '', year: '', status: '', sort: 'recent' },
   filesFilter: { year: '', category: '' },
@@ -2249,6 +2266,13 @@ function recordVisit() {
     logEvent('visits', { at: at, studentId: null, name: state.session && state.session.role === 'admin' ? 'Administrator' : 'Visitor', year: '' });
   }
   saveCounters();
+  // Mirror the visit to the shared counter. The configuration is loaded here
+  // as well so the very first visit of a session is still counted.
+  if (repoParts()) {
+    loadSyncConfig().then(function () { return syncVisit(); }).catch(function () { /* offline */ });
+  } else {
+    syncVisit();
+  }
 }
 
 function logEvent(bucket, entry) {
@@ -2304,44 +2328,73 @@ function makePassword(username, year) {
   var digits = yearNumber(year);
   return (username + digits).toLowerCase();
 }
-function registerStudent(firstName, year) {
-  firstName = String(firstName || '').trim().replace(/\s+/g, ' ');
-  if (firstName.length < 2) throw new Error('Please enter the student’s first name (at least 2 letters).');
+function validateRegistration(firstName, year) {
+  if (!firstName || firstName.length < 2) throw new Error('Please enter the student’s first name (at least 2 letters).');
   if (!/^[A-Za-z][A-Za-z'\- ]*$/.test(firstName)) throw new Error('Please use letters only for the first name.');
   if (!year) throw new Error('Please choose a year level.');
   if (!state.settings.openRegistration) throw new Error('Self-registration is currently closed. Please ask your teacher to add you.');
-
-  var username = uniqueUsername(firstName);
-  var password = makePassword(username, year);
-  var now = new Date().toISOString();
-  var student = {
-    id: uid('stu'),
-    firstName: titleCase(firstName),
-    username: username,
-    password: password,
-    year: year,
-    registeredAt: now,
-    firstVisit: now,
-    lastVisit: now,
-    visitCount: 0,
-    downloadCount: 0,
-    downloads: [],
-    status: 'active',
-    device: deviceId(),
-    notes: ''
-  };
-  state.students.push(student);
-  saveStudents();
-  logEvent('logins', { at: now, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Registration' });
-  state.session = { role: 'student', studentId: student.id, at: now };
-  saveSession();
-  return student;
 }
-function loginStudent(username, password) {
-  var u = String(username || '').trim().toLowerCase();
-  var p = String(password || '');
+// Registers in the shared backend when it is reachable, otherwise on this
+// device only. The result tells the caller where the account landed.
+function registerStudent(firstName, year) {
+  firstName = String(firstName || '').trim().replace(/\s+/g, ' ');
+  validateRegistration(firstName, year);
+  var clientId = uid('stu');
+
+  function localStudent() {
+    var username = uniqueUsername(firstName);
+    var password = makePassword(username, year);
+    var now = new Date().toISOString();
+    var student = {
+      id: clientId,
+      firstName: titleCase(firstName),
+      username: username,
+      password: password,
+      year: year,
+      registeredAt: now,
+      firstVisit: now,
+      lastVisit: now,
+      visitCount: 0,
+      downloadCount: 0,
+      downloads: [],
+      status: 'active',
+      device: deviceId(),
+      notes: ''
+    };
+    state.students.push(student);
+    saveStudents();
+    logEvent('logins', { at: now, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Registration' });
+    state.session = { role: 'student', studentId: student.id, at: now };
+    saveSession();
+    return student;
+  }
+
+  if (!syncActive()) return Promise.resolve({ student: localStudent(), shared: false });
+
+  return syncRegister(firstName, year, clientId).then(function (result) {
+    var student = result.student;
+    if (!student) return { student: localStudent(), shared: false };
+    var now = new Date().toISOString();
+    logEvent('logins', { at: now, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Registration' });
+    state.session = { role: 'student', studentId: student.id, at: now };
+    saveSession();
+    renderAll();
+    return { student: student, shared: true, already: result.already };
+  }, function (err) {
+    // Validation problems (registration closed, invalid name) are final;
+    // connection problems fall back to this device and are queued to sync.
+    if (err && err.fatal) throw err;
+    var student = localStudent();
+    syncQueueAdd({
+      name: 'madv_register',
+      studentId: student.id,
+      payload: { p_first_name: firstName, p_year: year, p_client_id: clientId }
+    });
+    return { student: student, shared: false, offline: true, error: err ? err.message : '' };
+  });
+}
+function loginStudentLocally(u, p, at) {
   var student = state.students.filter(function (s) { return s.username.toLowerCase() === u; })[0];
-  var at = new Date().toISOString();
   if (!student) {
     logEvent('logins', { at: at, studentId: null, name: u || '(blank)', year: '', ok: false, kind: 'Unknown username' });
     throw new Error('No student found with that username. Register first, or ask your teacher to check the admin register.');
@@ -2361,6 +2414,32 @@ function loginStudent(username, password) {
   // signed-in student without incrementing the global visitor total again.
   recordStudentVisit(student, at);
   return student;
+}
+// Signs in against the shared register when it is reachable, so the same
+// account works on every device, and falls back to this device when offline.
+function loginStudent(username, password) {
+  var u = String(username || '').trim().toLowerCase();
+  var p = String(password || '');
+  var at = new Date().toISOString();
+  if (!syncActive()) return Promise.resolve(loginStudentLocally(u, p, at));
+  return syncLogin(u, p).then(function (student) {
+    if (!student) return loginStudentLocally(u, p, at);
+    logEvent('logins', { at: at, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Sign in' });
+    state.session = { role: 'student', studentId: student.id, at: at };
+    saveSession();
+    recordStudentVisit(student, at);
+    renderAll();
+    return student;
+  }, function (err) {
+    // An explicit refusal from the shared register (blocked, wrong password,
+    // unknown username) is final for accounts it knows — otherwise a blocked
+    // student could still sign in on the device that registered them. A record
+    // that only exists on this device (registered while offline) and a backend
+    // that cannot be reached both fall back to the local copy.
+    var local = state.students.filter(function (s) { return s.username.toLowerCase() === u; })[0];
+    if (err && err.refused && local && local.syncedAt) throw err;
+    return loginStudentLocally(u, p, at);
+  });
 }
 function loginAdmin(username, password) {
   var u = String(username || '').trim().toLowerCase();
@@ -2533,54 +2612,162 @@ function cloudDataUrl() {
   return 'https://raw.githubusercontent.com/' + repo.full + '/' + (state.settings.branch || 'main') + '/' +
     String(state.settings.dataDir || 'data').replace(/\/+$/, '') + '/cloud-data.json';
 }
-function downloadCounterConfigPath() {
-  return String(state.settings.dataDir || 'data').replace(/\/+$/, '') + '/download-counter.json';
+/* -------------------- Shared cloud sync (Supabase backend) ---------------
+   GitHub Pages is static: a browser can never write to the repository on its
+   own, because that would mean shipping a GitHub write token in public code.
+   Instead every device talks to the small PostgreSQL backend defined in
+   backends/supabase/schema.sql using the *publishable* key, which is safe to
+   publish because Row Level Security blocks direct table access and only the
+   madv_* functions below are exposed.
+
+   That backend makes registration, sign-in, the visitor counter and the
+   download counter shared across every device. A GitHub Action (or the admin
+   browser) then mirrors the shared register into data/cloud-data.json, so the
+   repository always holds the class list as well.
+   ---------------------------------------------------------------------- */
+var SYNC_TIMEOUT_MS = 12000;
+var SYNC_QUEUE_MAX = 200;
+
+function syncConfigPath() {
+  return String(state.settings.dataDir || 'data').replace(/\/+$/, '') + '/sync-config.json';
 }
-function downloadCounterConfigUrl() {
+function syncConfigUrl() {
   var repo = repoParts();
   if (!repo) return '';
   return 'https://raw.githubusercontent.com/' + repo.full + '/' + (state.settings.branch || 'main') + '/' +
-    encodePath(downloadCounterConfigPath());
+    encodePath(syncConfigPath());
 }
-function normalizeCounterApiEndpoint(value) {
-  value = String(value || '').trim();
-  if (!value) return '';
+function normalizeSyncConfig(raw) {
+  var cfg = raw && typeof raw === 'object' ? raw : {};
+  var provider = String(cfg.provider || 'supabase').toLowerCase();
+  var url = String(cfg.url || cfg.projectUrl || '').trim().replace(/\/+$/, '');
+  var key = String(cfg.publishableKey || cfg.key || '').trim();
+  if (!url && !key) return { provider: provider, url: '', key: '' };
   var parsed;
-  try { parsed = new URL(value); }
-  catch (err) { throw new Error('Enter the HTTPS origin for the deployed Cloudflare Worker.'); }
-  if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password || parsed.search || parsed.hash || (parsed.pathname && parsed.pathname !== '/')) {
-    throw new Error('Use only the HTTPS Worker origin, for example https://madv-download-counter.example.workers.dev.');
+  try { parsed = new URL(url); }
+  catch (err) { throw new Error('Enter the Supabase project URL, for example https://abcdefghijklmnop.supabase.co.'); }
+  // http:// is only tolerated for a local test instance (localhost/127.0.0.1).
+  var localTest = parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1');
+  if ((parsed.protocol !== 'https:' && !localTest) || parsed.username || parsed.password) {
+    throw new Error('The Supabase project URL must start with https:// and must not contain a password.');
   }
-  return parsed.origin;
+  if (!key) throw new Error('Add the Supabase publishable key as well as the project URL.');
+  if (/^sb_secret_/i.test(key) || /service_role/i.test(key)) {
+    throw new Error('That is a secret key. Use the publishable key (sb_publishable_… or the legacy anon JWT) — secret keys bypass Row Level Security.');
+  }
+  return { provider: provider, url: parsed.origin, key: key };
 }
-function loadCounterApiConfig(force) {
-  if (state.counterApi.loaded && !force) return Promise.resolve(state.counterApi.endpoint);
-  if (state.counterApi.loading) return state.counterApi.loading;
-  var url = downloadCounterConfigUrl();
+function applySyncConfig(cfg, fromRepo) {
+  state.sync.provider = cfg.provider || 'supabase';
+  state.sync.url = cfg.url || '';
+  state.sync.key = cfg.key || '';
+  state.sync.loaded = true;
+  state.sync.fromRepo = !!fromRepo;
+  store.set(KEYS.syncConfig, { provider: state.sync.provider, url: state.sync.url, key: state.sync.key });
+  if (!state.sync.url) syncQueueSave([]);
+}
+function loadSyncConfig(force) {
+  if (state.sync.loaded && !force) return Promise.resolve(state.sync.url);
+  if (state.sync.loading) return state.sync.loading;
+  // A saved copy keeps the page working offline on the next visit.
+  var cached = store.get(KEYS.syncConfig, null);
+  if (cached && cached.url && cached.key && !state.sync.url) {
+    try { applySyncConfig(normalizeSyncConfig(cached), false); } catch (err) { /* ignore a stale copy */ }
+  }
+  var url = syncConfigUrl();
   if (!url) {
-    state.counterApi.loaded = true;
-    state.counterApi.endpoint = '';
-    return Promise.resolve('');
+    state.sync.loaded = true;
+    return Promise.resolve(state.sync.url);
   }
   var request = fetch(url + '?t=' + Date.now(), { cache: 'no-store' }).then(function (res) {
-    if (res.status === 404) return { endpoint: '' };
-    if (!res.ok) throw new Error('Download counter configuration could not be read (HTTP ' + res.status + ').');
+    if (res.status === 404) return {};
+    if (!res.ok) throw new Error('The shared backend configuration could not be read (HTTP ' + res.status + ').');
     return res.json();
-  }).then(function (config) {
-    state.counterApi.endpoint = normalizeCounterApiEndpoint(config && config.endpoint);
-    state.counterApi.loaded = true;
-    state.counterApi.error = '';
-    if (!state.counterApi.endpoint) store.set(KEYS.pendingDownloads, []);
-    return state.counterApi.endpoint;
+  }).then(function (raw) {
+    applySyncConfig(normalizeSyncConfig(raw), true);
+    state.sync.error = '';
+    return state.sync.url;
   }).catch(function (err) {
-    state.counterApi.error = err.message || 'Download counter configuration could not be read.';
-    state.counterApi.loaded = false;
-    throw err;
+    state.sync.error = err.message || 'The shared backend configuration could not be read.';
+    state.sync.loaded = false;
+    return '';
   });
-  state.counterApi.loading = request;
-  request.then(function () { state.counterApi.loading = null; renderSettings(); }, function () { state.counterApi.loading = null; renderSettings(); });
+  state.sync.loading = request;
+  request.then(function () { state.sync.loading = null; renderSettings(); },
+               function () { state.sync.loading = null; renderSettings(); });
   return request;
 }
+function syncReady() { return !!(state.sync.url && state.sync.key); }
+function syncActive() { return syncReady() && state.settings.syncEnabled !== false; }
+
+function syncHttpError(status, data) {
+  var detail = data && (data.message || data.error || data.hint) ? String(data.message || data.error || data.hint) : '';
+  var err;
+  if (status === 401 || status === 403) {
+    err = new Error('The Supabase key was rejected (HTTP ' + status + '). Save the current publishable key in Cloud settings.');
+    err.fatal = true;
+  } else if (status === 404) {
+    err = new Error('The shared backend is missing its database functions. Run backends/supabase/schema.sql in the Supabase SQL editor.');
+    err.fatal = true;
+  } else if (status === 429) {
+    err = new Error('The shared backend is rate limited (HTTP 429). Try again in a moment.');
+    err.offline = true;
+  } else if (status >= 500) {
+    err = new Error('The Supabase project is paused or unavailable (HTTP ' + status + '). Open Supabase to resume it — the site keeps working meanwhile.');
+    err.offline = true;
+  } else {
+    err = new Error('Shared backend error (HTTP ' + status + ')' + (detail ? ': ' + detail : ''));
+    err.fatal = true;
+  }
+  return err;
+}
+function syncRpc(name, payload, options) {
+  if (!syncReady()) {
+    var missing = new Error('The shared backend is not configured yet.');
+    missing.fatal = true;
+    return Promise.reject(missing);
+  }
+  var controller = typeof AbortController === 'function' ? new AbortController() : null;
+  var timer = controller ? setTimeout(function () { controller.abort(); }, (options && options.timeout) || SYNC_TIMEOUT_MS) : null;
+  var done = function (value) { if (timer) clearTimeout(timer); return value; };
+  return fetch(state.sync.url + '/rest/v1/rpc/' + name, {
+    method: 'POST',
+    headers: {
+      apikey: state.sync.key,
+      Authorization: 'Bearer ' + state.sync.key,
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify(payload || {}),
+    cache: 'no-store',
+    signal: controller ? controller.signal : undefined
+  }).then(function (res) {
+    return res.text().then(function (text) {
+      var data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (err) { data = null; }
+      if (!res.ok) throw syncHttpError(res.status, data);
+      if (data && data.ok === false) {
+        // The backend answered and said no: never retry this silently.
+        var refused = new Error(data.error || 'The shared backend refused the request.');
+        refused.fatal = true;
+        refused.refused = true;
+        throw refused;
+      }
+      return data;
+    });
+  }).catch(function (err) {
+    if (err && err.fatal) throw err;
+    if (err && err.name === 'AbortError') {
+      var slow = new Error('The shared backend did not answer in time — the change was saved on this device.');
+      slow.offline = true;
+      throw slow;
+    }
+    var wrapped = new Error(err && err.message ? err.message : 'The shared backend could not be reached.');
+    wrapped.offline = true;
+    throw wrapped;
+  }).then(done, function (err) { done(); throw err; });
+}
+
 function githubFileUrl(path) {
   var repo = repoParts();
   if (!repo) return 'https://github.com';
@@ -2601,115 +2788,430 @@ function renderCounterViews() {
   else if (state.view === 'dashboard') renderDashboard();
   renderSettings();
 }
-function applyRemoteDownloadStats(stats) {
-  if (!stats || stats.ok !== true || !Number.isSafeInteger(Number(stats.total)) || Number(stats.total) < 0) {
-    throw new Error('The shared download counter returned invalid data.');
-  }
-  state.counters.downloads = Number(stats.total);
-  var perFile = stats.perFile && typeof stats.perFile === 'object' ? stats.perFile : {};
-  var changed = false;
-  state.resources.forEach(function (item) {
-    if (item.source === 'device') return;
-    var record = perFile[counterResourceKey(item)];
-    var total = record && Number.isSafeInteger(Number(record.total)) ? Number(record.total) : 0;
-    var lastAt = record && record.lastDownloadAt ? record.lastDownloadAt : null;
-    if ((item.downloads || 0) !== total || (item.lastDownloadAt || null) !== lastAt) {
-      item.downloads = total;
-      item.lastDownloadAt = lastAt;
-      changed = true;
-    }
-  });
-  if (changed) saveResources();
-  saveCounters();
-  state.counterApi.lastSync = new Date().toISOString();
+/* Offline queue ------------------------------------------------------- */
+function syncQueue() {
+  var q = store.get(KEYS.pendingSync, []);
+  return Array.isArray(q) ? q : [];
 }
-function applyRemoteDownloadEvent(data, fallbackKey) {
-  if (!data || data.ok !== true || !Number.isSafeInteger(Number(data.total))) return;
-  state.counters.downloads = Math.max(0, Number(data.total));
+function syncQueueSave(list) {
+  var q = (list || []).slice(-SYNC_QUEUE_MAX);
+  store.set(KEYS.pendingSync, q);
+  state.sync.pending = q.length;
+  return q;
+}
+function syncQueueDrop(id) {
+  syncQueueSave(syncQueue().filter(function (entry) { return entry.id !== id; }));
+}
+function syncQueueAdd(entry) {
+  var q = syncQueue();
+  if (q.length >= SYNC_QUEUE_MAX) return false;
+  entry.id = entry.id || newCounterEventId('q');
+  entry.at = entry.at || new Date().toISOString();
+  entry.tries = 0;
+  q.push(entry);
+  syncQueueSave(q);
+  renderSettings();
+  return true;
+}
+function syncQueueFlush() {
+  if (!syncReady() || state.sync.flushing) return Promise.resolve(0);
+  var snapshot = syncQueue();
+  if (!snapshot.length) { state.sync.pending = 0; return Promise.resolve(0); }
+  state.sync.flushing = true;
+  var sent = 0;
+  var index = 0;
+  function next() {
+    if (index >= snapshot.length) return Promise.resolve(sent);
+    var entry = snapshot[index];
+    index++;
+    // A visit from hours ago is not worth replaying; registrations always are.
+    if (entry.name === 'madv_visit' && Date.now() - new Date(entry.at || 0).getTime() > 12 * 3600 * 1000) {
+      syncQueueDrop(entry.id);
+      return next();
+    }
+    return syncRpc(entry.name, entry.payload).then(function (data) {
+      sent++;
+      syncApplyQueued(entry, data);
+      syncQueueDrop(entry.id);
+      return next();
+    }, function (err) {
+      entry.tries = (entry.tries || 0) + 1;
+      if (err && err.fatal) {
+        syncQueueDrop(entry.id);
+        state.sync.error = err.message;
+      } else if (entry.tries > 6) {
+        syncQueueDrop(entry.id);
+      } else {
+        var list = syncQueue();
+        list.forEach(function (item) { if (item.id === entry.id) item.tries = entry.tries; });
+        syncQueueSave(list);
+      }
+      return next();
+    });
+  }
+  return next().then(function (count) {
+    state.sync.flushing = false;
+    state.sync.pending = syncQueue().length;
+    if (count) { saveStudents(); saveCounters(); renderAll(); }
+    return count;
+  }, function () {
+    state.sync.flushing = false;
+    return 0;
+  });
+}
+function syncApplyQueued(entry, data) {
+  if (!data || data.ok !== true) return;
+  if (entry.name === 'madv_register') {
+    var created = studentFromRow(data);
+    if (entry.studentId && created && created.id !== entry.studentId) {
+      // The shared register already had that name, so it issued a new username.
+      adoptSyncedStudent(entry.studentId, created);
+    }
+  } else if (entry.name === 'madv_download') {
+    applySyncDownload(data, entry.resourceKey || (entry.payload && entry.payload.p_resource_key));
+  } else if (entry.name === 'madv_visit') {
+    applySyncStats(data);
+  }
+}
+
+/* Mapping between backend rows and local student records --------------- */
+function studentFromRow(row) {
+  if (!row || !row.username) return null;
+  var clientId = row.clientId || row.client_id || uid('stu');
+  var existing = state.students.filter(function (s) { return s.id === clientId; })[0];
+  var student = existing || {
+    id: clientId,
+    downloads: [],
+    registeredAt: row.registeredAt || new Date().toISOString(),
+    device: deviceId(),
+    status: 'active',
+    notes: '',
+    visitCount: 0,
+    downloadCount: 0
+  };
+  if (row.id) student.cloudId = row.id;
+  student.firstName = row.firstName || row.first_name || student.firstName || titleCase(row.username);
+  student.username = row.username;
+  student.password = row.password || student.password;
+  if (row.year) student.year = row.year;
+  if (row.status) student.status = row.status;
+  if (row.notes !== undefined && row.notes !== null) student.notes = row.notes;
+  if (row.registeredAt) student.registeredAt = row.registeredAt;
+  if (row.lastVisit && (!student.lastVisit || new Date(row.lastVisit) > new Date(student.lastVisit))) student.lastVisit = row.lastVisit;
+  if (typeof row.visitCount === 'number') student.visitCount = Math.max(student.visitCount || 0, row.visitCount);
+  if (typeof row.downloadCount === 'number') student.downloadCount = Math.max(student.downloadCount || 0, row.downloadCount);
+  student.syncedAt = new Date().toISOString();
+  if (!existing) state.students.push(student);
+  saveStudents();
+  return student;
+}
+// The shared backend issued a different username than the offline guess.
+function adoptSyncedStudent(oldId, student) {
+  var renamed = null;
+  state.students = state.students.filter(function (s) {
+    if (s.id !== oldId) return true;
+    renamed = s;
+    return false;
+  });
+  if (!renamed) return;
+  student.downloads = renamed.downloads || student.downloads || [];
+  student.visitCount = Math.max(student.visitCount || 0, renamed.visitCount || 0);
+  student.downloadCount = Math.max(student.downloadCount || 0, renamed.downloadCount || 0);
+  student.device = renamed.device || student.device;
+  state.students.push(student);
+  (state.logs.downloads || []).forEach(function (entry) { if (entry.studentId === oldId) entry.studentId = student.id; });
+  (state.logs.logins || []).forEach(function (entry) { if (entry.studentId === oldId) entry.studentId = student.id; });
+  (state.logs.visits || []).forEach(function (entry) { if (entry.studentId === oldId) entry.studentId = student.id; });
+  if (state.session && state.session.role === 'student' && state.session.studentId === oldId) {
+    state.session.studentId = student.id;
+    saveSession();
+  }
+  saveStudents();
+  saveLogs();
+}
+
+/* Shared operations ---------------------------------------------------- */
+function syncRegister(firstName, year, clientId) {
+  return syncRpc('madv_register', { p_first_name: firstName, p_year: year, p_client_id: clientId })
+    .then(function (row) {
+      if (!row || row.ok !== true) {
+        var refused = new Error((row && row.error) || 'Registration was refused by the shared backend.');
+        refused.fatal = true;
+        throw refused;
+      }
+      return { student: studentFromRow(row), row: row, already: !!row.alreadyRegistered };
+    });
+}
+function syncLogin(username, password) {
+  return syncRpc('madv_login', { p_username: username, p_password: password }).then(function (row) {
+    if (!row || row.ok !== true) {
+      var refused = new Error((row && row.error) || 'Sign in was refused by the shared backend.');
+      refused.fatal = true;
+      refused.refused = true;
+      throw refused;
+    }
+    return studentFromRow(row);
+  });
+}
+function syncVisit() {
+  if (!syncActive()) return Promise.resolve(null);
+  var student = currentStudent();
+  var payload = {
+    p_device_id: deviceId(),
+    p_day: todayKey(),
+    p_student_id: student ? student.id : null,
+    p_name: student ? student.firstName : (state.session && state.session.role === 'admin' ? 'Administrator' : 'Visitor'),
+    p_year: student ? student.year : ''
+  };
+  return syncRpc('madv_visit', payload).then(function (data) {
+    applySyncStats(data);
+    state.sync.status = 'ok';
+    state.sync.lastSync = new Date().toISOString();
+    state.sync.error = '';
+    renderCounterViews();
+    return data;
+  }, function (err) {
+    if (!err.fatal) syncQueueAdd({ name: 'madv_visit', payload: payload });
+    state.sync.error = err.message;
+    return null;
+  });
+}
+function syncDownloadEvent(item, student) {
+  var resourceKey = counterResourceKey(item);
+  if (!resourceKey || !syncActive()) return Promise.resolve(null);
+  var payload = {
+    p_event_id: newCounterEventId(),
+    p_resource_key: resourceKey,
+    p_payload: {
+      day: todayKey(),
+      at: new Date().toISOString(),
+      studentId: student ? student.id : null,
+      studentName: student ? student.firstName : 'Guest',
+      studentYear: student ? student.year : '',
+      resourceId: item.id,
+      title: item.title,
+      fileName: item.fileName,
+      category: item.category,
+      topic: item.topic,
+      year: item.year
+    }
+  };
+  return syncRpc('madv_download', payload).then(function (data) {
+    applySyncDownload(data, resourceKey);
+    state.sync.status = 'ok';
+    state.sync.lastSync = new Date().toISOString();
+    state.sync.error = '';
+    renderCounterViews();
+    return data;
+  }, function (err) {
+    if (!err.fatal) syncQueueAdd({ name: 'madv_download', payload: payload, resourceKey: resourceKey });
+    else state.sync.error = err.message;
+    return null;
+  });
+}
+function syncStats() {
+  if (!syncReady()) return Promise.resolve(null);
+  return syncRpc('madv_stats').then(function (stats) {
+    applySyncStats(stats);
+    state.sync.status = 'ok';
+    state.sync.lastSync = new Date().toISOString();
+    state.sync.error = '';
+    saveCounters();
+    renderCounterViews();
+    return stats;
+  }, function (err) {
+    state.sync.status = 'error';
+    state.sync.error = err.message;
+    renderSettings();
+    return null;
+  });
+}
+function syncPullRoster() {
+  if (!syncActive() || !currentAdmin()) return Promise.resolve(null);
+  return syncRpc('madv_admin_export', {
+    p_admin_user: state.settings.adminUser || '',
+    p_admin_pass: state.settings.adminPass || '',
+    p_day: todayKey()
+  }).then(function (snapshot) {
+    if (!snapshot || snapshot.ok !== true) {
+      var refused = new Error((snapshot && snapshot.error) || 'The shared register could not be read.');
+      refused.fatal = true;
+      throw refused;
+    }
+    var added = mergeCloudData(snapshot);
+    state.sync.rosterAt = new Date().toISOString();
+    state.sync.status = 'ok';
+    state.sync.error = '';
+    renderAll();
+    return added;
+  }, function (err) {
+    state.sync.error = err.message;
+    renderSettings();
+    return null;
+  });
+}
+function syncAdminStudent(action, student) {
+  if (!syncActive() || !student) return Promise.resolve(null);
+  return syncRpc('madv_admin_student', {
+    p_action: action,
+    p_payload: {
+      clientId: student.id,
+      firstName: student.firstName,
+      username: student.username,
+      password: student.password,
+      year: student.year,
+      status: student.status,
+      notes: student.notes || '',
+      visitCount: student.visitCount || 0,
+      downloadCount: student.downloadCount || 0,
+      lastVisit: student.lastVisit || null
+    },
+    p_admin_user: state.settings.adminUser || '',
+    p_admin_pass: state.settings.adminPass || ''
+  }).then(function () { return true; }, function (err) {
+    toast('Shared register not updated: ' + err.message, 'warn');
+    return false;
+  });
+}
+function syncNow(silent) {
+  if (!syncReady()) {
+    if (!silent) toast('Save the Supabase project URL and publishable key first.', 'warn');
+    return Promise.resolve(false);
+  }
+  state.sync.status = 'syncing';
+  renderSettings();
+  return syncQueueFlush().then(function () {
+    return syncStats();
+  }).then(function (stats) {
+    var jobs = [syncPullRoster()];
+    return Promise.all(jobs).then(function (result) {
+      state.sync.status = stats ? 'ok' : 'error';
+      if (!silent) {
+        var added = result[0];
+        toast(stats
+          ? 'Shared backend synced' + (added ? ' — ' + added + ' new student record(s) pulled in.' : '.')
+          : 'The shared backend could not be reached; local data is unchanged.', stats ? 'success' : 'error');
+      }
+      renderAll();
+      return !!stats;
+    });
+  });
+}
+function testSyncConnection() {
+  if (!syncReady()) { toast('Save the Supabase project URL and publishable key first.', 'warn'); return; }
+  state.sync.status = 'syncing';
+  renderSettings();
+  syncRpc('madv_health').then(function (info) {
+    state.sync.status = 'ok';
+    state.sync.error = '';
+    toast('Connected to the shared backend — ' + (info && info.students !== undefined ? info.students + ' student(s) registered.' : 'schema is ready.'), 'success');
+    renderSettings();
+  }, function (err) {
+    state.sync.status = 'error';
+    state.sync.error = err.message;
+    toast(err.message, 'error');
+    renderSettings();
+  });
+}
+function saveSyncConfig() {
+  if (!currentAdmin()) return openAdminAuth();
+  var raw = {
+    provider: 'supabase',
+    url: ($('#sync-url') && $('#sync-url').value) || '',
+    publishableKey: ($('#sync-key') && $('#sync-key').value) || ''
+  };
+  var cfg;
+  try { cfg = normalizeSyncConfig(raw); }
+  catch (err) {
+    state.sync.error = err.message;
+    renderSettings();
+    toast(err.message, 'error');
+    return;
+  }
+  applySyncConfig(cfg, false);
+  state.sync.status = 'syncing';
+  renderSettings();
+  var repo = repoParts();
+  if (cfg.url && repo && currentToken()) {
+    var path = syncConfigPath();
+    var payload = JSON.stringify({
+      _comment: 'Public configuration only. The Supabase project URL and publishable key are safe to expose because Row Level Security restricts every request to the madv_* functions. Never store a secret key or a GitHub token here.',
+      provider: cfg.provider,
+      url: cfg.url,
+      publishableKey: cfg.key
+    }, null, 2);
+    ghGetFile(path).then(function (existing) {
+      return ghPutFile(path, b64EncodeText(payload), 'Configure the shared Supabase backend', existing ? existing.sha : undefined);
+    }).then(function () {
+      toast('Shared backend saved to the repository — every device will connect automatically.', 'success');
+      return syncNow(true);
+    }).catch(function (err) {
+      state.sync.error = err.message || 'Could not save the shared backend configuration.';
+      toast('Saved on this device, but not written to GitHub: ' + state.sync.error, 'warn');
+      renderSettings();
+    });
+  } else {
+    toast(cfg.url
+      ? 'Shared backend saved on this device. Save the GitHub token as well to publish it for every device.'
+      : 'Shared backend cleared on this device.', cfg.url ? 'success' : 'info');
+    syncNow(true);
+  }
+}
+
+function newCounterEventId(prefix) {
+  var head = prefix || 'evt';
+  try { return head + '_' + crypto.randomUUID().replace(/-/g, ''); }
+  catch (err) { return uid(head) + uid('r').slice(-6); }
+}
+/* Applying shared counters -------------------------------------------- */
+function applySyncStats(stats) {
+  if (!stats || stats.ok !== true) return;
+  rollDay();
+  if (typeof stats.visits === 'number') state.counters.visits = Math.max(state.counters.visits || 0, stats.visits);
+  if (typeof stats.downloads === 'number') state.counters.downloads = Math.max(state.counters.downloads || 0, stats.downloads);
+  if (typeof stats.uniqueVisitors === 'number') state.counters.uniqueVisitors = Math.max(state.counters.uniqueVisitors || 0, stats.uniqueVisitors);
+  if (stats.daily && typeof stats.daily === 'object') {
+    Object.keys(stats.daily).forEach(function (day) {
+      var row = stats.daily[day];
+      var visits = typeof row === 'number' ? row : (row && row.visits);
+      if (typeof visits === 'number') state.counters.daily[day] = Math.max(state.counters.daily[day] || 0, visits);
+    });
+    var today = stats.day || todayKey();
+    var rowToday = stats.daily[today];
+    if (rowToday) {
+      if (typeof rowToday.visits === 'number') state.counters.visitsToday = Math.max(state.counters.visitsToday || 0, rowToday.visits);
+      if (typeof rowToday.downloads === 'number') state.counters.downloadsToday = Math.max(state.counters.downloadsToday || 0, rowToday.downloads);
+    }
+  }
+  if (stats.perFile && typeof stats.perFile === 'object') {
+    var changed = false;
+    state.resources.forEach(function (item) {
+      var key = counterResourceKey(item);
+      var record = key && stats.perFile[key];
+      if (!record) return;
+      var total = Number.isFinite(Number(record.total)) ? Number(record.total) : null;
+      if (total !== null && (item.downloads || 0) !== total) { item.downloads = total; changed = true; }
+      if (record.lastDownloadAt && record.lastDownloadAt !== item.lastDownloadAt) {
+        item.lastDownloadAt = record.lastDownloadAt;
+        changed = true;
+      }
+    });
+    if (changed) saveResources();
+  }
+  saveCounters();
+}
+function applySyncDownload(data, fallbackKey) {
+  if (!data || data.ok !== true) return;
+  state.counters.downloads = Math.max(state.counters.downloads || 0, Number(data.total) || 0);
   var key = data.resourceKey || fallbackKey;
-  var item = state.resources.filter(function (resource) { return counterResourceKey(resource) === key; })[0];
+  var item = key ? state.resources.filter(function (resource) { return counterResourceKey(resource) === key; })[0] : null;
   if (item) {
-    item.downloads = Math.max(0, Number(data.resourceTotal) || 0);
-    item.lastDownloadAt = data.lastDownloadAt || item.lastDownloadAt || null;
+    if (Number.isFinite(Number(data.resourceTotal))) item.downloads = Math.max(0, Number(data.resourceTotal));
+    if (data.lastDownloadAt) item.lastDownloadAt = data.lastDownloadAt;
     saveResources();
   }
   saveCounters();
-  state.counterApi.lastSync = new Date().toISOString();
-  renderCounterViews();
-}
-function newCounterEventId() {
-  try { return 'evt_' + crypto.randomUUID().replace(/-/g, ''); }
-  catch (err) { return uid('evt') + uid('r').slice(-6); }
-}
-function flushPendingDownloads() {
-  var endpoint = state.counterApi.endpoint;
-  var queue = store.get(KEYS.pendingDownloads, []);
-  if (!endpoint || !Array.isArray(queue) || !queue.length) return Promise.resolve(true);
-  var snapshot = queue.slice();
-  function sendAt(index) {
-    if (index >= snapshot.length) return Promise.resolve(true);
-    var entry = snapshot[index];
-    return fetch(endpoint + '/v1/download', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ eventId: entry.eventId, resourceKey: entry.resourceKey })
-    }).then(function (res) {
-      return res.json().catch(function () { return {}; }).then(function (data) {
-        if (!res.ok || data.ok !== true) throw new Error((data && data.error ? data.error : 'Counter API rejected a download') + ' (HTTP ' + res.status + ')');
-        var current = store.get(KEYS.pendingDownloads, []);
-        store.set(KEYS.pendingDownloads, (Array.isArray(current) ? current : []).filter(function (item) { return item.eventId !== entry.eventId; }));
-        applyRemoteDownloadEvent(data, entry.resourceKey);
-        return sendAt(index + 1);
-      });
-    }).catch(function (err) {
-      state.counterApi.error = err.message || 'Some downloads are waiting to sync.';
-      return false;
-    });
-  }
-  return sendAt(0);
-}
-function queueDownloadEvent(item) {
-  var resourceKey = counterResourceKey(item);
-  if (!resourceKey || (state.counterApi.loaded && !state.counterApi.endpoint)) return Promise.resolve(false);
-  var queue = store.get(KEYS.pendingDownloads, []);
-  if (!Array.isArray(queue)) queue = [];
-  if (queue.length >= 5000) {
-    state.counterApi.error = 'The offline download queue is full; reconnect to sync before downloading more.';
-    renderSettings();
-    return Promise.resolve(false);
-  }
-  var entry = { eventId: newCounterEventId(), resourceKey: resourceKey };
-  queue.push(entry);
-  store.set(KEYS.pendingDownloads, queue);
-  if (state.counterApi.endpoint) return flushPendingDownloads();
-  return loadCounterApiConfig().then(function (endpoint) {
-    return endpoint ? flushPendingDownloads() : false;
-  }).catch(function () { return false; });
-}
-function syncDownloadCounter(forceConfig) {
-  return loadCounterApiConfig(!!forceConfig).then(function (endpoint) {
-    if (!endpoint) {
-      renderSettings();
-      return false;
-    }
-    return flushPendingDownloads().then(function () {
-      return fetch(endpoint + '/v1/stats', { cache: 'no-store', headers: { 'Accept': 'application/json' } });
-    }).then(function (res) {
-      return res.json().catch(function () { return {}; }).then(function (stats) {
-        if (!res.ok || stats.ok !== true) throw new Error((stats && stats.error ? stats.error : 'Shared download counter is unavailable') + ' (HTTP ' + res.status + ')');
-        applyRemoteDownloadStats(stats);
-        var pending = store.get(KEYS.pendingDownloads, []);
-        state.counterApi.error = Array.isArray(pending) && pending.length
-          ? pending.length + ' download(s) are waiting to sync.' : '';
-        renderCounterViews();
-        return true;
-      });
-    });
-  }).catch(function (err) {
-    state.counterApi.error = err.message || 'Shared download counter could not be reached.';
-    renderSettings();
-    return false;
-  });
+  state.sync.lastSync = new Date().toISOString();
 }
 
 function tokenStore() {
@@ -3015,8 +3517,24 @@ function guessCategory(text) {
 
 /* Cloud activity data (counters + student records + logs) -------------- */
 function cloudDataPayload() {
+  // The mirror in the repository is public: names, usernames and counts are
+  // written, passwords never are. Passwords stay in the shared backend.
+  var withRoster = state.settings.syncRosterInRepo !== false;
+  var students = !withRoster ? [] : state.students.map(function (s) {
+    var copy = Object.assign({}, s);
+    delete copy.password;
+    copy.passwordRule = 'username + year number (kept in the shared backend)';
+    return copy;
+  });
+  var stripNames = function (entry) {
+    var copy = Object.assign({}, entry);
+    delete copy.studentId;
+    copy.name = copy.studentName = 'Student';
+    return copy;
+  };
   return {
-    _comment: 'Optional cloud snapshot. This file is public in a public repository and can contain student names, usernames, plaintext passwords and activity logs. Do not sync sensitive student data here.',
+    _comment: 'Mirror of the shared backend (Supabase). This file is public in a public repository: it holds student names, usernames and activity counts, but never passwords. Turn off "Let the repository mirror keep student names" in Cloud settings to store counters only.',
+    source: 'shared-backend',
     subject: SUBJECT,
     updatedAt: new Date().toISOString(),
     counters: {
@@ -3025,10 +3543,10 @@ function cloudDataPayload() {
       downloadsToday: state.counters.downloadsToday, day: state.counters.day,
       daily: state.counters.daily || {}, devices: (state.counters.devices || []).slice(-5000)
     },
-    students: state.students,
-    logins: (state.logs.logins || []).slice(0, 400),
-    downloads: (state.logs.downloads || []).slice(0, 400),
-    visits: (state.logs.visits || []).slice(0, 400)
+    students: students,
+    logins: (state.logs.logins || []).slice(0, 400).map(withRoster ? function (e) { return e; } : stripNames),
+    downloads: (state.logs.downloads || []).slice(0, 400).map(withRoster ? function (e) { return e; } : stripNames),
+    visits: (state.logs.visits || []).slice(0, 400).map(withRoster ? function (e) { return e; } : stripNames)
   };
 }
 function mergeCloudData(remote) {
@@ -3042,7 +3560,8 @@ function mergeCloudData(remote) {
   if (c.daily && typeof c.daily === 'object') {
     Object.keys(c.daily).forEach(function (day) {
       var val = c.daily[day];
-      if (typeof val === 'number' && val > (state.counters.daily[day] || 0)) { state.counters.daily[day] = val; changed = true; }
+      var visits = typeof val === 'number' ? val : (val && typeof val.visits === 'number' ? val.visits : null);
+      if (visits !== null && visits > (state.counters.daily[day] || 0)) { state.counters.daily[day] = visits; changed = true; }
     });
   }
   if (Array.isArray(c.devices)) {
@@ -3055,10 +3574,11 @@ function mergeCloudData(remote) {
   if (Array.isArray(remote.students)) {
     remote.students.forEach(function (rs) {
       if (!rs || (!rs.username && !rs.id)) return;
-      var local = state.students.filter(function (s) { return s.id === rs.id || s.username === rs.username; })[0];
+      var local = state.students.filter(function (s) {
+        return (rs.clientId && s.id === rs.clientId) || s.id === rs.id || (rs.username && s.username === rs.username);
+      })[0];
       if (!local) {
-        state.students.push(rs);
-        added++; changed = true;
+        if (studentFromRow(rs)) { added++; changed = true; }
       } else {
         local.visitCount = Math.max(local.visitCount || 0, rs.visitCount || 0);
         local.downloadCount = Math.max(local.downloadCount || 0, rs.downloadCount || 0);
@@ -3133,7 +3653,7 @@ function pushCloudData(silent) {
   if (!silent) {
     return confirmDialog({
       title: 'Push activity data to public GitHub?',
-      message: 'This writes activity logs and, when present, student names, usernames and plaintext passwords to cloud-data.json. The current repository is public, so anyone can read them. Continue only for non-sensitive test data.',
+      message: 'This writes the register (student names, usernames and activity counts — never passwords) and the counters to cloud-data.json. The current repository is public, so anyone can read the names. Continue only if publishing your class list there is acceptable.',
       confirmLabel: 'I understand — push the data', danger: true
     }).then(function (ok) { return ok ? push() : false; });
   }
@@ -3249,9 +3769,10 @@ function renderCounters() {
   var pill = $('#visitor-pill');
   if (pill) pill.title = formatCount(state.counters.uniqueVisitors || 0) + ' unique devices · ' + formatCount(state.counters.visitsToday || 0) + ' visits today';
   var dpill = $('#download-pill');
-  if (dpill) dpill.title = state.counterApi.endpoint
-    ? 'Shared total from all browsers · ' + formatCount(state.counters.downloadsToday || 0) + ' counted today in this browser'
-    : 'This browser only. Configure the shared download counter API to combine users.';
+  if (dpill) dpill.title = syncReady()
+    ? 'Shared total from every device · ' + formatCount(state.counters.downloadsToday || 0) + ' downloads today' +
+      (state.sync.lastSync ? ' · synced ' + relativeTime(state.sync.lastSync) : '')
+    : 'This browser only. Connect the shared backend in Cloud settings to combine every device.';
 }
 function renderAll() {
   applyVisibility();
@@ -3556,7 +4077,7 @@ function renderDashboard() {
     kpis.innerHTML = [
       kpiHtml('Registered students', formatCount(students.length), formatCount(activeWeek) + ' active in the last 7 days', 'users', 'kpi--indigo'),
       kpiHtml('Visits', formatCount(state.counters.visits || 0), formatCount(state.counters.visitsToday || 0) + ' today · ' + formatCount(state.counters.uniqueVisitors || 0) + ' devices', 'activity', ''),
-      kpiHtml('File downloads', formatCount(state.counters.downloads || 0), formatCount(state.counters.downloadsToday || 0) + ' today in this browser · ' + formatCount(totalStudentDownloads) + ' by students on this device', 'cloud-download', 'kpi--emerald'),
+      kpiHtml('File downloads', formatCount(state.counters.downloads || 0), formatCount(state.counters.downloadsToday || 0) + ' today' + (syncReady() ? ' · shared across devices' : ' · this device only') + ' · ' + formatCount(totalStudentDownloads) + ' recorded for students', 'cloud-download', 'kpi--emerald'),
       kpiHtml('Resources', formatCount(state.resources.length), state.resources.filter(function (r) { return r.source === 'cloud'; }).length + ' in the cloud · ' + formatBytes(totalBytes), 'folder', 'kpi--amber'),
       kpiHtml('Students active today', formatCount(activeToday), formatCount(blocked) + ' blocked account' + (blocked === 1 ? '' : 's'), 'user-check', 'kpi--indigo'),
       kpiHtml('Never signed in', formatCount(students.filter(function (s) { return !s.visitCount; }).length), 'Registered but no visit recorded', 'clock', 'kpi--rose')
@@ -3571,10 +4092,12 @@ function renderDashboard() {
       pieces.push(currentToken()
         ? 'write token is stored in this browser only'
         : '<b>read-only on this browser</b> — its registrations and activity stay local');
-      pieces.push(state.counterApi.endpoint
-        ? 'shared download counter connected' + (state.counterApi.lastSync ? ' · synced ' + esc(relativeTime(state.counterApi.lastSync)) : '')
-        : '<b>shared download counter not configured</b> — download totals are local to each browser');
-      if (state.counterApi.error) pieces.push('<b>' + esc(state.counterApi.error) + '</b>');
+      pieces.push(syncReady()
+        ? 'shared backend connected' + (state.sync.lastSync ? ' · synced ' + esc(relativeTime(state.sync.lastSync)) : '') +
+          (state.sync.rosterAt ? ' · register pulled ' + esc(relativeTime(state.sync.rosterAt)) : '')
+        : '<b>shared backend not configured</b> — registrations, visits and downloads stay on this device');
+      if (syncReady() && state.sync.pending) pieces.push(esc(state.sync.pending) + ' change(s) waiting to sync');
+      if (state.sync.error) pieces.push('<b>' + esc(state.sync.error) + '</b>');
       pieces.push(state.cloud.lastSync ? 'last cloud sync ' + esc(relativeTime(state.cloud.lastSync)) : 'not synced yet');
     } else {
       pieces.push('No repository configured — everything is stored in this browser. Add the repository and access token in Cloud settings to publish to the cloud.');
@@ -3874,18 +4397,40 @@ function renderSettings() {
   $('#data-downloads').textContent = formatCount(state.counters.downloads || 0);
   $('#data-visits').textContent = formatCount(state.counters.visits || 0);
   $('#data-size').textContent = formatBytes(store.size());
-  var counterEndpoint = $('#download-counter-endpoint');
-  if (counterEndpoint && !counterEndpoint.value) counterEndpoint.value = state.counterApi.endpoint || '';
-  var counterStatus = $('#download-counter-status');
-  if (counterStatus) {
-    counterStatus.textContent = state.counterApi.endpoint ? 'Connected' : 'Not configured';
-    counterStatus.className = 'tag ' + (state.counterApi.endpoint ? 'tag--emerald' : 'tag--amber');
+  var syncUrl = $('#sync-url');
+  if (syncUrl && !syncUrl.value) syncUrl.value = state.sync.url || '';
+  var syncKey = $('#sync-key');
+  if (syncKey && !syncKey.value) syncKey.value = state.sync.key || '';
+  var syncStatus = $('#sync-status');
+  if (syncStatus) {
+    var label = state.sync.status === 'ok' ? 'Connected'
+      : state.sync.status === 'syncing' ? 'Syncing…'
+      : (state.sync.url ? 'Not connected' : 'Not configured');
+    syncStatus.textContent = label;
+    syncStatus.className = 'tag ' + (state.sync.status === 'ok' ? 'tag--emerald' : (state.sync.url ? 'tag--amber' : ''));
   }
-  var counterError = $('#download-counter-error');
-  if (counterError) {
-    counterError.hidden = !state.counterApi.error;
-    counterError.textContent = state.counterApi.error || '';
+  var syncError = $('#sync-error');
+  if (syncError) {
+    syncError.hidden = !state.sync.error;
+    syncError.textContent = state.sync.error || '';
   }
+  var syncHint = $('#sync-hint');
+  if (syncHint) syncHint.innerHTML = syncHintHtml();
+  setSwitch('#opt-sync-enabled', state.settings.syncEnabled !== false);
+  setSwitch('#opt-sync-roster', state.settings.syncRosterInRepo !== false);
+}
+function syncHintHtml() {
+  if (!syncReady()) {
+    return 'Not configured: registrations, visits and downloads stay on each device until the shared backend is connected. ' +
+      'Create the free Supabase project, run <code>backends/supabase/schema.sql</code> and paste the project URL and publishable key above.';
+  }
+  var parts = [];
+  parts.push(state.sync.fromRepo ? 'Configuration loaded from <code>data/sync-config.json</code>.' : 'Configuration saved on this device.');
+  if (state.sync.lastSync) parts.push('Counters synced ' + esc(relativeTime(state.sync.lastSync)) + '.');
+  if (state.sync.rosterAt) parts.push('Register pulled ' + esc(relativeTime(state.sync.rosterAt)) + '.');
+  if (state.sync.pending) parts.push('<b>' + state.sync.pending + ' change(s) waiting for a connection.</b>');
+  parts.push('The GitHub Action mirrors the shared register into <code>data/cloud-data.json</code> every hour.');
+  return parts.join(' ');
 }
 function setSwitch(sel, value) {
   var el = $(sel);
@@ -4028,7 +4573,7 @@ function downloadResource(id) {
     downloadBlob(item.fileName, blob);
     // Count only after the file was fetched successfully, not on a failed click.
     recordDownload(item, student);
-    queueDownloadEvent(item);
+    syncDownloadEvent(item, student);
     renderCounters();
     if (state.view === 'library') renderLibrary();
     else if (state.view === 'my-learning') renderMyLearning();
@@ -4043,7 +4588,7 @@ function downloadResource(id) {
       // The cross-origin fallback was handed to the browser; record this
       // fallback attempt because the page cannot observe its completion.
       recordDownload(item, student);
-      queueDownloadEvent(item);
+      syncDownloadEvent(item, student);
       renderCounters();
       if (state.view === 'library') renderLibrary();
       else if (state.view === 'my-learning') renderMyLearning();
@@ -4434,42 +4979,6 @@ function deleteToken() {
     toast('Saved access token deleted from this browser.', 'success');
   });
 }
-function saveCounterApiEndpoint() {
-  if (!currentAdmin()) return openAdminAuth();
-  var input = $('#download-counter-endpoint');
-  var endpoint;
-  try { endpoint = normalizeCounterApiEndpoint(input ? input.value : ''); }
-  catch (err) {
-    state.counterApi.error = err.message;
-    renderSettings();
-    toast(err.message, 'error');
-    return;
-  }
-  var repo = repoParts();
-  if (!repo) { toast('Save the GitHub repository location first.', 'warn'); return; }
-  if (!currentToken()) { toast('Save the admin GitHub token first so this public endpoint URL can be written to the repository.', 'warn'); return; }
-  var path = downloadCounterConfigPath();
-  var payload = JSON.stringify({
-    _comment: 'Public configuration only. Set endpoint to the deployed Cloudflare Worker URL; never put secrets or GitHub tokens here.',
-    endpoint: endpoint
-  }, null, 2);
-  ghGetFile(path).then(function (existing) {
-    return ghPutFile(path, b64EncodeText(payload), 'Configure shared download counter API', existing ? existing.sha : undefined);
-  }).then(function () {
-    state.counterApi.endpoint = endpoint;
-    state.counterApi.loaded = true;
-    state.counterApi.error = '';
-    if (!endpoint) store.set(KEYS.pendingDownloads, []);
-    if (input) input.value = endpoint;
-    renderSettings();
-    toast(endpoint ? 'Shared download counter endpoint saved. Checking the service…' : 'Shared download counter endpoint cleared.', 'success');
-    if (endpoint) return syncDownloadCounter();
-  }).catch(function (err) {
-    state.counterApi.error = err.message || 'Could not save the counter API endpoint.';
-    renderSettings();
-    toast('Could not save the counter API endpoint: ' + state.counterApi.error, 'error');
-  });
-}
 function saveCloudSettings() {
   state.settings.repo = ($('#repo-input').value || '').trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   state.settings.branch = ($('#branch-input').value || 'main').trim() || 'main';
@@ -4496,6 +5005,8 @@ function detectRepo() {
 function saveOptions() {
   state.settings.cloudSync = $('#opt-cloud-sync').checked;
   state.settings.pushAnalytics = $('#opt-push-analytics').checked;
+  state.settings.syncEnabled = $('#opt-sync-enabled').checked;
+  state.settings.syncRosterInRepo = $('#opt-sync-roster').checked;
   state.settings.openRegistration = $('#opt-open-registration').checked;
   state.settings.requireLogin = $('#opt-require-login').checked;
   state.settings.showBlockedMessage = $('#opt-blocked-copy').checked;
@@ -4669,7 +5180,9 @@ function renderStudentAuth() {
           '<div><dt>Username</dt><dd>' + esc(auth.result.username) + '</dd></div>' +
           '<div><dt>Password</dt><dd>' + esc(auth.result.password) + '</dd></div>' +
           '<div><dt>Year level</dt><dd>' + esc(auth.result.year) + '</dd></div>' +
-        '</dl><p class="note">Write these down or copy them now. The password is your username followed by your year number.</p>' +
+        '</dl><p class="note">Write these down or copy them now. The password is your username followed by your year number. ' +
+          (auth.result.shared ? 'Your account is already saved in the shared cloud, so you can sign in from any device.'
+                              : 'This device is offline, so the account is saved here first and added to the shared cloud automatically.') + '</p>' +
       '</div>' +
       '<button type="button" class="btn btn--dark btn--block mt-3" data-action="copy-credentials">' + svgIcon('copy', 'ico--sm') + ' Copy my sign-in details</button>' +
       '<button type="button" class="btn btn--primary btn--block mt-2" data-action="go-my-learning">' + svgIcon('book', 'ico--sm') + ' Go to my learning</button>';
@@ -4684,7 +5197,9 @@ function renderStudentAuth() {
           '<input class="input" id="sa-user" autocomplete="username" placeholder="e.g. peter" required></div>' +
         '<div class="field"><label for="sa-pass">Password</label>' +
           '<input class="input" id="sa-pass" type="password" autocomplete="current-password" placeholder="e.g. peter11" required></div>' +
-        '<p class="hint">Your password is your username followed by your year level number (peter + 11 → peter11). Accounts on this static site are saved only in the browser that registered them.</p>' +
+        '<p class="hint">Your password is your username followed by your year level number (peter + 11 → peter11). ' + (syncReady()
+          ? 'Accounts are shared, so you can sign in here from any device.'
+          : 'On this site accounts are saved in the browser that registered them.') + '</p>' +
         (auth.error ? '<p class="field-error mt-2">' + esc(auth.error) + '</p>' : '') +
         '<button type="submit" class="btn btn--emerald btn--block btn--lg mt-3">' + svgIcon('log-in', 'ico--sm') + ' Log in</button>' +
         '<p class="hint mt-3">No account yet? Choose <b>Register</b> above — it takes one step.</p>' +
@@ -4704,7 +5219,9 @@ function renderStudentAuth() {
           '<div class="notice notice--info">' +
             '<div>The system will give you a <b>username</b> (your first name) and a <b>password</b> (your name + year level).</div>' +
           '</div>' +
-          '<div class="notice notice--warn mt-3"><div><b>This is device-local registration.</b> This static site cannot share your account with another browser. Ask your teacher if you need to use a different device.</div></div>' +
+          '<div class="notice notice--info mt-3"><div>' + (syncReady()
+            ? 'Your account is created in the <b>shared cloud</b>, so you can sign in from any device with these details.'
+            : 'Without the shared backend connected this account stays on this device. Ask your teacher if you need to use a different device.') + '</div></div>' +
           (auth.error ? '<p class="field-error mt-2">' + esc(auth.error) + '</p>' : '') +
           '<button type="submit" class="btn btn--emerald btn--block btn--lg mt-3">' + svgIcon('user-plus', 'ico--sm') + ' Register and get my login</button>' +
         '</form>';
@@ -4715,7 +5232,9 @@ function renderStudentAuth() {
     openModal({
       name: 'student-auth', icon: 'graduation-cap', badge: 'emerald',
       title: auth.result ? 'Registration complete' : 'Student access',
-      subtitle: auth.result ? 'Your account is saved in this browser.' : 'Register with your first name and year level, or log in with the details saved in this browser.',
+      subtitle: auth.result
+        ? (auth.result.shared ? 'Your account is saved in the shared cloud — sign in from any device.' : 'Your account is saved on this device and will sync to the shared cloud.')
+        : 'Register with your first name and year level, or log in with the details you were given.',
       size: 'sm', body: body, actions: []
     });
   } else {
@@ -4726,35 +5245,48 @@ function renderStudentAuth() {
   var regForm = $('#student-register-form');
   if (regForm) regForm.addEventListener('submit', submitStudentRegister);
 }
+function authBusy(form, busy, label) {
+  var btn = form ? form.querySelector('button[type="submit"]') : null;
+  if (!btn) return;
+  btn.disabled = !!busy;
+  btn.innerHTML = svgIcon(busy ? 'loader' : 'log-in', 'ico--sm' + (busy ? ' spin' : '')) + ' ' + esc(label);
+}
 function submitStudentLogin(event) {
   event.preventDefault();
-  try {
-    var student = loginStudent($('#sa-user').value, $('#sa-pass').value);
+  authBusy(event.target, true, 'Signing in…');
+  loginStudent($('#sa-user').value, $('#sa-pass').value).then(function (student) {
     state.authModal.error = '';
     closeModal();
     renderAll();
     toast('Welcome back, ' + student.firstName + ' (' + student.year + ').', 'success');
     showView('my-learning');
-  } catch (err) {
+  }, function (err) {
     state.authModal.error = err.message;
     renderStudentAuth();
-  }
+  });
 }
 function submitStudentRegister(event) {
   event.preventDefault();
-  try {
-    var student = registerStudent($('#sr-name').value, $('#sr-year').value);
+  authBusy(event.target, true, 'Registering…');
+  registerStudent($('#sr-name').value, $('#sr-year').value).then(function (result) {
+    var student = result.student;
     // Registration happens within the page visit already counted at startup.
     recordStudentVisit(student);
-    state.authModal.result = { username: student.username, password: student.password, year: student.year };
+    state.authModal.result = {
+      username: student.username, password: student.password, year: student.year,
+      shared: !!result.shared, offline: !!result.offline
+    };
     state.authModal.error = '';
     renderAll();
     renderStudentAuth();
-    toast('Registered. Your username is ' + student.username + ' and your password is ' + student.password + '.', 'success');
-  } catch (err) {
+    toast(result.shared
+      ? 'Registered on the shared cloud — you can now sign in from any device.'
+      : 'Registered. Your username is ' + student.username + ' and your password is ' + student.password + '.', 'success');
+    if (result.offline) toast('Saved on this device — it will be added to the shared cloud when the connection returns.', 'info');
+  }, function (err) {
     state.authModal.error = err.message;
     renderStudentAuth();
-  }
+  });
 }
 function copyCredentials() {
   var r = state.authModal.result;
@@ -5057,6 +5589,7 @@ var ACTIONS = {
       if (!ok) return;
       s.password = newPass;
       saveStudents();
+      syncAdminStudent('upsert', s);
       renderAll();
       toast(s.firstName + '’s new password is ' + newPass + '.', 'success');
     });
@@ -5076,6 +5609,7 @@ var ACTIONS = {
       if (!ok) return;
       s.status = blocking ? 'blocked' : 'active';
       saveStudents();
+      syncAdminStudent('upsert', s);
       if (currentToken() && state.settings.pushAnalytics) pushCloudData(true);
       renderAll();
       toast(s.firstName + ' is now ' + (blocking ? 'blocked' : 'active') + '.', 'success');
@@ -5092,6 +5626,7 @@ var ACTIONS = {
       if (!ok) return;
       state.students = state.students.filter(function (x) { return x.id !== s.id; });
       saveStudents();
+      syncAdminStudent('delete', s);
       if (currentToken() && state.settings.pushAnalytics) pushCloudData(true);
       renderAll();
       toast('Student record deleted.', 'success');
@@ -5121,7 +5656,9 @@ var ACTIONS = {
   'reset-counters': function () {
     confirmDialog({
       title: 'Reset the counters?',
-      message: 'Visit and download totals return to zero. The activity logs and student histories stay.',
+      message: syncReady()
+        ? 'Visit and download totals return to zero on this device. The shared totals come back on the next sync — reset them in the Supabase dashboard if you need to clear them everywhere.'
+        : 'Visit and download totals return to zero. The activity logs and student histories stay.',
       confirmLabel: 'Reset counters', danger: true
     }).then(function (ok) {
       if (!ok) return;
@@ -5189,16 +5726,18 @@ var ACTIONS = {
   'delete-token': function () { deleteToken(); },
   'save-cloud': function () { saveCloudSettings(); },
   'detect-repo': function () { detectRepo(); },
-  'save-counter-api': function () { saveCounterApiEndpoint(); },
-  'sync-counter-api': function () {
-    syncDownloadCounter(true).then(function (ok) {
-      if (ok) toast('Shared download totals refreshed.', 'success');
-      else if (state.counterApi.error) toast(state.counterApi.error, 'error');
-      else toast('Deploy the Cloudflare Worker and save its URL first.', 'warn');
-    });
-  },
+  'save-sync': function () { saveSyncConfig(); },
+  'test-sync': function () { testSyncConnection(); },
+  'sync-now': function () { syncNow(false); },
   'sync-cloud': function () { cloudSyncNow(false); },
-  'push-cloud': function () { pushCloudData(false); },
+  'push-cloud': function () {
+    if (syncActive() && currentAdmin()) {
+      toast('Pulling the shared register first…', 'info');
+      syncNow(true).then(function () { pushCloudData(false); });
+    } else {
+      pushCloudData(false);
+    }
+  },
   'save-options': function () { saveOptions(); },
   'save-admin': function () { saveAdminCredentials(); },
   'reset-admin': function () { resetAdminCredentials(); },
@@ -5352,7 +5891,7 @@ function wireEvents() {
 
   window.addEventListener('online', function () {
     updateConnectionState();
-    if (repoParts()) syncDownloadCounter();
+    if (syncReady()) syncQueueFlush();
   });
   window.addEventListener('offline', updateConnectionState);
   window.addEventListener('beforeunload', function () { saveSession(); });
@@ -5378,7 +5917,7 @@ function refreshRelativeTimes() {
   if (state.view === 'dashboard') { renderStudentTable(); renderFeeds(); renderAnalytics(); renderFilesTable(); }
   else if (state.view === 'my-learning') renderMyLearning();
   renderCounters();
-  if (state.counterApi.endpoint && state.cloud.online) syncDownloadCounter();
+  if (syncReady() && state.cloud.online !== false && navigator.onLine !== false) syncQueueFlush();
 }
 function init() {
   // The previous release enabled public analytics writes by default. Reset that
@@ -5424,12 +5963,13 @@ function init() {
   showView(state.view || 'library');
 
   if (repoParts()) {
+    var startSync = loadSyncConfig().then(function () { return syncQueueFlush(); }).then(function () { return syncStats(); });
     if (state.settings.cloudSync) {
-      cloudSyncNow(true).then(function () {
-        if (state.settings.pushAnalytics && currentToken()) maybePushAnalytics();
+      startSync.then(function () {
+        return cloudSyncNow(true).then(function () {
+          if (state.settings.pushAnalytics && currentToken()) maybePushAnalytics();
+        });
       });
-    } else {
-      syncDownloadCounter();
     }
   }
   setInterval(refreshRelativeTimes, 60000);
