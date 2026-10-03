@@ -1,0 +1,39 @@
+{
+  "_comment": "Counters, student register and activity written by the Mathematics Advanced subject cloud. Read by the site; sensitive only in that it lists issued usernames and passwords.",
+  "subject": "Mathematics Advanced",
+  "updatedAt": "2026-10-03T12:41:49.381Z",
+  "counters": {
+    "visits": 1,
+    "visitsToday": 1,
+    "uniqueVisitors": 1,
+    "downloads": 0,
+    "downloadsToday": 0,
+    "day": "2026-10-03",
+    "daily": {
+      "2026-10-03": 1
+    },
+    "devices": [
+      "dev_musdk4k3lnwkpm"
+    ]
+  },
+  "students": [],
+  "logins": [
+    {
+      "at": "2026-10-03T12:36:04.126Z",
+      "studentId": null,
+      "name": "Administrator (peter82)",
+      "year": "",
+      "ok": true,
+      "kind": "Admin sign in"
+    }
+  ],
+  "downloads": [],
+  "visits": [
+    {
+      "at": "2026-10-03T12:35:07.155Z",
+      "studentId": null,
+      "name": "Visitor",
+      "year": ""
+    }
+  ]
+}
