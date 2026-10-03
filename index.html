@@ -337,7 +337,6 @@ main{display:block;padding-block:1.75rem 3rem}
 .file-icon--other{background:var(--slate-100);color:var(--slate-500)}
 .fresh{display:inline-flex;align-items:center;gap:.35rem;font-size:.72rem;font-weight:700;border-radius:999px;
   padding:.2rem .6rem;border:1px solid transparent}
-body[data-view="library"] .admin-only{display:none !important}
 
 /* ---------- 10. Stat cards, tables, charts ---------- */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr));gap:1rem}
@@ -545,7 +544,6 @@ table.data th.num{text-align:right}
   .site-header,.site-footer,.toast-stack,.modal,.no-print,.hero__cta,.toolbar{display:none !important}
   body{background:#fff}
   .panel,.kpi,.rcard,.band{box-shadow:none;border-color:#cbd5e1}
-  .view{display:block !important}
   .table-wrap{overflow:visible}
   table.data th,table.data td{white-space:normal}
 }
@@ -2281,7 +2279,8 @@ function recordDownload(item, student) {
 
 /* ------------------------------ 5. Students ------------------------------- */
 function uniqueUsername(firstName) {
-  var base = slug(firstName).replace(/\./g, '') || 'student';
+  // "Mary Jane" -> "maryjane" so the issued username is simply the student's name
+  var base = String(firstName || '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'student';
   var candidate = base, n = 2;
   var taken = state.students.map(function (s) { return s.username.toLowerCase(); });
   while (taken.indexOf(candidate.toLowerCase()) >= 0) { candidate = base + n; n++; }
@@ -4308,7 +4307,7 @@ function updateUploadMode() {
   var chip = $('#upload-mode-chip');
   var text = $('#upload-mode-text');
   if (text) text.textContent = canCloud ? 'Cloud publishing — students can download' : 'This device only — add an access token to publish';
-  if (chip) chip.className = 'live-chip' + (canCloud ? '' : ' band__warn');
+  if (chip) chip.className = 'live-chip';
   var notice = $('#upload-no-token');
   if (notice) notice.hidden = canCloud;
   var hint = $('#publish-hint');
