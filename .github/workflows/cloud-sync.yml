@@ -1,0 +1,56 @@
+name: Mirror the shared register
+
+# Copies the shared Supabase register and counters into data/cloud-data.json
+# so the repository always reflects the live class list — no Cloudflare, no
+# admin browser needed. Configure the backend once in Cloud settings on the
+# site (it writes data/sync-config.json); this job reads that file.
+on:
+  schedule:
+    - cron: '18 * * * *'      # hourly
+  workflow_dispatch:
+  push:
+    paths:
+      - data/sync-config.json
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cloud-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Export the shared register
+        env:
+          ADMIN_USER: ${{ secrets.ADMIN_USER || 'peter82' }}
+          ADMIN_PASS: ${{ secrets.ADMIN_PASS || 'petgabs82' }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          SITE_TIMEZONE: ${{ vars.SITE_TIMEZONE || 'Australia/Sydney' }}
+        run: node scripts/export-cloud-data.mjs
+
+      - name: Commit the update
+        run: |
+          if [ -z "$(git status --porcelain data/cloud-data.json)" ]; then
+            echo "No change to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/cloud-data.json
+          git commit -m "Sync the shared register and counters
+
+          Mirrors student registrations, visits and downloads from the shared
+          backend into data/cloud-data.json. Passwords are never written."
+          git push
