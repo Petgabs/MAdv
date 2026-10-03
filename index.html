@@ -11,7 +11,7 @@
 <!-- Static, single-file deployment. Everything the page needs is inline, so the
      only external hosts allowed are the ones used for cloud publishing,
      file previews and Office/PDF rendering. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com https://cdn.jsdelivr.net; font-src 'self' data:; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://cdn.jsdelivr.net data: blob:; frame-src 'self' blob: data: https://raw.githubusercontent.com https://cdn.jsdelivr.net https://view.officeapps.live.com https://mozilla.github.io https://docs.google.com; worker-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com https://cdn.jsdelivr.net; font-src 'self' data:; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://cdn.jsdelivr.net https://*.workers.dev data: blob:; frame-src 'self' blob: data: https://raw.githubusercontent.com https://cdn.jsdelivr.net https://view.officeapps.live.com https://mozilla.github.io https://docs.google.com; worker-src 'none'; form-action 'none'">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='16' y='23' font-family='Segoe UI,Arial' font-size='17' font-weight='700' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
 
 <style>
@@ -1530,11 +1530,10 @@ table.data th.num{text-align:right}
           </div>
         </div>
 
-        <div class="notice notice--ok mb-6">
+        <div class="notice notice--warn mb-6">
           <svg class="ico ico--sm" aria-hidden="true"><use href="#i-shield-check"/></svg>
           <div>
-            <b>Everything works without a token.</b> Students can always browse and download files that are already hosted.
-            The access token is only needed to upload new files and to sync counters and records to the cloud.
+            <b>Static-site limit:</b> registrations and visitor counts created in a browser stay on that device. The optional Cloudflare download-counter API combines downloads without exposing a GitHub token; deploy it and configure its public URL below. A GitHub token saved here only publishes files and does not give other visitors write access. Shared student registration and global visitor counts still need their own backend.
           </div>
         </div>
 
@@ -1585,8 +1584,8 @@ table.data th.num{text-align:right}
           </div>
           <div class="panel__foot">
             <p class="hint">
-              Where the token lives: in this browser's storage (or only this tab if you ticked the box above).
-              It is never written into this HTML file and never sent anywhere except <code>api.github.com</code>.
+              The token stays in this browser's local/session storage and is sent only to <code>api.github.com</code>.
+              It is never written to the HTML or repository. Do not put it in <code>cloud-data.json</code> or a hidden admin field: this public static site is delivered to every visitor, and a Contents: write token could change or delete repository files. Shared access must use a server-side secret.
             </p>
           </div>
         </section>
@@ -1622,7 +1621,7 @@ table.data th.num{text-align:right}
               <div class="field">
                 <label for="datadir-input">Data folder</label>
                 <input class="input" id="datadir-input" type="text" placeholder="data" autocomplete="off" spellcheck="false">
-                <p class="hint">Holds <code>cloud-data.json</code> for counters and student records.</p>
+                <p class="hint">Holds <code>cloud-data.json</code>. In a public repository, anyone can read its counters, student details and activity logs.</p>
               </div>
             </div>
             <div class="row row--wrap">
@@ -1639,6 +1638,33 @@ table.data th.num{text-align:right}
           </div>
         </section>
 
+        <!-- Shared download counter API -->
+        <section class="panel mb-6" aria-labelledby="counter-api-heading">
+          <div class="panel__head">
+            <div>
+              <h3 id="counter-api-heading">Shared download counter</h3>
+              <p>Connect the Cloudflare Worker + D1 service so successful downloads count across browsers.</p>
+            </div>
+            <span class="tag" id="download-counter-status">Not configured</span>
+          </div>
+          <div class="panel__body">
+            <div class="field">
+              <label for="download-counter-endpoint">Cloudflare Worker URL</label>
+              <input class="input" id="download-counter-endpoint" type="url" inputmode="url" placeholder="https://madv-download-counter.example.workers.dev" autocomplete="off" spellcheck="false">
+              <p class="hint">This URL is public, not a secret. Saving it writes only the endpoint to <code>data/download-counter.json</code>, which all browsers can read. The API receives a resource key and one-time event ID—never the GitHub token or student details.</p>
+            </div>
+            <div class="row row--wrap">
+              <button type="button" class="btn btn--dark" data-action="save-counter-api">
+                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-save"/></svg> Save endpoint to GitHub
+              </button>
+              <button type="button" class="btn btn--outline" data-action="sync-counter-api">
+                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-refresh"/></svg> Test / refresh shared totals
+              </button>
+            </div>
+            <p class="field-error mt-3" id="download-counter-error" hidden role="alert"></p>
+          </div>
+        </section>
+
         <!-- Behaviour -->
         <section class="panel mb-6" aria-labelledby="behaviour-heading">
           <div class="panel__head">
@@ -1649,8 +1675,9 @@ table.data th.num{text-align:right}
           </div>
           <div class="panel__body stack">
             <label class="switch"><input type="checkbox" id="opt-cloud-sync"><span class="switch__track"></span> Pull the shared library and counters from the cloud on every visit</label>
-            <label class="switch"><input type="checkbox" id="opt-push-analytics"><span class="switch__track"></span> Push student records and counters back to the cloud after changes</label>
-            <label class="switch"><input type="checkbox" id="opt-open-registration"><span class="switch__track"></span> Allow students to register themselves</label>
+            <label class="switch"><input type="checkbox" id="opt-push-analytics"><span class="switch__track"></span> Push this browser's student records and counters to GitHub after changes</label>
+            <div class="notice notice--warn"><div><b>Privacy warning:</b> the current repository is public. <code>cloud-data.json</code> includes student names, usernames, passwords and activity logs; enabling this writes them in plaintext where anyone can read them. Leave this off for student data. A server-side backend is required for private shared registration.</div></div>
+            <label class="switch"><input type="checkbox" id="opt-open-registration"><span class="switch__track"></span> Allow students to register themselves (in this browser only)</label>
             <label class="switch"><input type="checkbox" id="opt-require-login"><span class="switch__track"></span> Only signed-in students may download files</label>
             <label class="switch"><input type="checkbox" id="opt-blocked-copy"><span class="switch__track"></span> Show a "blocked" message to students whose access the admin removed</label>
             <div class="field-row">
@@ -1795,7 +1822,7 @@ table.data th.num{text-align:right}
 'use strict';
 
 /* ---------------------------- 1. Configuration --------------------------- */
-var APP_VERSION   = 'v2.0.0';
+var APP_VERSION   = 'v2.2.0';
 var SUBJECT       = 'Mathematics Advanced';
 var DEFAULT_ADMIN = { user: 'peter82', pass: 'petgabs82' };
 var DEFAULT_YEARS = ['Year 9', 'Year 10', 'Year 11', 'Year 12'];
@@ -1856,7 +1883,8 @@ var KEYS = {
   session: 'madv.session.v2',
   device: 'madv.device.v2',
   tree: 'madv.tree.v2',
-  token: 'madv.token.v2'
+  token: 'madv.token.v2',
+  pendingDownloads: 'madv.pending-downloads.v1'
 };
 var DEFAULT_SETTINGS = {
   repo: '',
@@ -1864,7 +1892,8 @@ var DEFAULT_SETTINGS = {
   filesDir: 'resources',
   dataDir: 'data',
   cloudSync: true,
-  pushAnalytics: true,
+  // Student records include credentials and must not be published to a public repo by default.
+  pushAnalytics: false,
   openRegistration: true,
   requireLogin: false,
   showBlockedMessage: true,
@@ -1937,6 +1966,7 @@ var state = {
   session: store.get(KEYS.session, null),
   cloud: { repo: '', branch: 'main', token: '', sessionOnly: false, librarySha: null, dataSha: null,
            lastSync: null, online: true, error: '', checked: false, login: '' },
+  counterApi: { endpoint: '', loaded: false, loading: null, lastSync: null, error: '' },
   filters: { query: '', year: '', topic: '', category: '', kind: '', sort: 'newest' },
   studentsFilter: { query: '', year: '', status: '', sort: 'recent' },
   filesFilter: { year: '', category: '' },
@@ -2186,6 +2216,17 @@ function rollDay() {
   while (keys.length > 60) { delete state.counters.daily[keys.shift()]; }
 }
 
+function recordStudentVisit(student, at) {
+  student = student || currentStudent();
+  if (!student) return;
+  at = at || new Date().toISOString();
+  student.visitCount = (student.visitCount || 0) + 1;
+  student.lastVisit = at;
+  saveStudents();
+  logEvent('visits', { at: at, studentId: student.id, name: student.firstName, year: student.year });
+  maybePushAnalytics();
+}
+
 function recordVisit() {
   rollDay();
   var id = deviceId();
@@ -2200,14 +2241,12 @@ function recordVisit() {
   state.counters.uniqueVisitors = state.counters.devices.length;
   state.counters.daily[todayKey()] = (state.counters.daily[todayKey()] || 0) + 1;
 
+  var at = new Date().toISOString();
   var student = currentStudent();
   if (student) {
-    student.visitCount = (student.visitCount || 0) + 1;
-    student.lastVisit = new Date().toISOString();
-    saveStudents();
-    logEvent('visits', { at: new Date().toISOString(), studentId: student.id, name: student.firstName, year: student.year });
+    recordStudentVisit(student, at);
   } else {
-    logEvent('visits', { at: new Date().toISOString(), studentId: null, name: state.session && state.session.role === 'admin' ? 'Administrator' : 'Visitor', year: '' });
+    logEvent('visits', { at: at, studentId: null, name: state.session && state.session.role === 'admin' ? 'Administrator' : 'Visitor', year: '' });
   }
   saveCounters();
 }
@@ -2315,12 +2354,12 @@ function loginStudent(username, password) {
     logEvent('logins', { at: at, studentId: student.id, name: student.firstName, year: student.year, ok: false, kind: 'Wrong password' });
     throw new Error('That password does not match. The password is your username followed by your year number (for example ' + student.username + yearNumber(student.year) + ').');
   }
-  student.lastVisit = at;
-  saveStudents();
   logEvent('logins', { at: at, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Sign in' });
   state.session = { role: 'student', studentId: student.id, at: at };
   saveSession();
-  recordVisit();
+  // The page visit was already counted during startup; attribute it to the
+  // signed-in student without incrementing the global visitor total again.
+  recordStudentVisit(student, at);
   return student;
 }
 function loginAdmin(username, password) {
@@ -2494,10 +2533,183 @@ function cloudDataUrl() {
   return 'https://raw.githubusercontent.com/' + repo.full + '/' + (state.settings.branch || 'main') + '/' +
     String(state.settings.dataDir || 'data').replace(/\/+$/, '') + '/cloud-data.json';
 }
+function downloadCounterConfigPath() {
+  return String(state.settings.dataDir || 'data').replace(/\/+$/, '') + '/download-counter.json';
+}
+function downloadCounterConfigUrl() {
+  var repo = repoParts();
+  if (!repo) return '';
+  return 'https://raw.githubusercontent.com/' + repo.full + '/' + (state.settings.branch || 'main') + '/' +
+    encodePath(downloadCounterConfigPath());
+}
+function normalizeCounterApiEndpoint(value) {
+  value = String(value || '').trim();
+  if (!value) return '';
+  var parsed;
+  try { parsed = new URL(value); }
+  catch (err) { throw new Error('Enter the HTTPS origin for the deployed Cloudflare Worker.'); }
+  if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password || parsed.search || parsed.hash || (parsed.pathname && parsed.pathname !== '/')) {
+    throw new Error('Use only the HTTPS Worker origin, for example https://madv-download-counter.example.workers.dev.');
+  }
+  return parsed.origin;
+}
+function loadCounterApiConfig(force) {
+  if (state.counterApi.loaded && !force) return Promise.resolve(state.counterApi.endpoint);
+  if (state.counterApi.loading) return state.counterApi.loading;
+  var url = downloadCounterConfigUrl();
+  if (!url) {
+    state.counterApi.loaded = true;
+    state.counterApi.endpoint = '';
+    return Promise.resolve('');
+  }
+  var request = fetch(url + '?t=' + Date.now(), { cache: 'no-store' }).then(function (res) {
+    if (res.status === 404) return { endpoint: '' };
+    if (!res.ok) throw new Error('Download counter configuration could not be read (HTTP ' + res.status + ').');
+    return res.json();
+  }).then(function (config) {
+    state.counterApi.endpoint = normalizeCounterApiEndpoint(config && config.endpoint);
+    state.counterApi.loaded = true;
+    state.counterApi.error = '';
+    if (!state.counterApi.endpoint) store.set(KEYS.pendingDownloads, []);
+    return state.counterApi.endpoint;
+  }).catch(function (err) {
+    state.counterApi.error = err.message || 'Download counter configuration could not be read.';
+    state.counterApi.loaded = false;
+    throw err;
+  });
+  state.counterApi.loading = request;
+  request.then(function () { state.counterApi.loading = null; renderSettings(); }, function () { state.counterApi.loading = null; renderSettings(); });
+  return request;
+}
 function githubFileUrl(path) {
   var repo = repoParts();
   if (!repo) return 'https://github.com';
   return 'https://github.com/' + repo.full + '/blob/' + (state.settings.branch || 'main') + '/' + encodePath(path);
+}
+
+function counterResourceKey(item) {
+  if (!item || item.source === 'device') return '';
+  var key = item.path && item.path.indexOf('http') !== 0
+    ? 'path:' + item.path
+    : (item.id ? 'id:' + item.id : 'file:' + (item.fileName || ''));
+  return key.length <= 300 ? key : '';
+}
+function renderCounterViews() {
+  renderCounters();
+  if (state.view === 'library') renderLibrary();
+  else if (state.view === 'my-learning') renderMyLearning();
+  else if (state.view === 'dashboard') renderDashboard();
+  renderSettings();
+}
+function applyRemoteDownloadStats(stats) {
+  if (!stats || stats.ok !== true || !Number.isSafeInteger(Number(stats.total)) || Number(stats.total) < 0) {
+    throw new Error('The shared download counter returned invalid data.');
+  }
+  state.counters.downloads = Number(stats.total);
+  var perFile = stats.perFile && typeof stats.perFile === 'object' ? stats.perFile : {};
+  var changed = false;
+  state.resources.forEach(function (item) {
+    if (item.source === 'device') return;
+    var record = perFile[counterResourceKey(item)];
+    var total = record && Number.isSafeInteger(Number(record.total)) ? Number(record.total) : 0;
+    var lastAt = record && record.lastDownloadAt ? record.lastDownloadAt : null;
+    if ((item.downloads || 0) !== total || (item.lastDownloadAt || null) !== lastAt) {
+      item.downloads = total;
+      item.lastDownloadAt = lastAt;
+      changed = true;
+    }
+  });
+  if (changed) saveResources();
+  saveCounters();
+  state.counterApi.lastSync = new Date().toISOString();
+}
+function applyRemoteDownloadEvent(data, fallbackKey) {
+  if (!data || data.ok !== true || !Number.isSafeInteger(Number(data.total))) return;
+  state.counters.downloads = Math.max(0, Number(data.total));
+  var key = data.resourceKey || fallbackKey;
+  var item = state.resources.filter(function (resource) { return counterResourceKey(resource) === key; })[0];
+  if (item) {
+    item.downloads = Math.max(0, Number(data.resourceTotal) || 0);
+    item.lastDownloadAt = data.lastDownloadAt || item.lastDownloadAt || null;
+    saveResources();
+  }
+  saveCounters();
+  state.counterApi.lastSync = new Date().toISOString();
+  renderCounterViews();
+}
+function newCounterEventId() {
+  try { return 'evt_' + crypto.randomUUID().replace(/-/g, ''); }
+  catch (err) { return uid('evt') + uid('r').slice(-6); }
+}
+function flushPendingDownloads() {
+  var endpoint = state.counterApi.endpoint;
+  var queue = store.get(KEYS.pendingDownloads, []);
+  if (!endpoint || !Array.isArray(queue) || !queue.length) return Promise.resolve(true);
+  var snapshot = queue.slice();
+  function sendAt(index) {
+    if (index >= snapshot.length) return Promise.resolve(true);
+    var entry = snapshot[index];
+    return fetch(endpoint + '/v1/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ eventId: entry.eventId, resourceKey: entry.resourceKey })
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok || data.ok !== true) throw new Error((data && data.error ? data.error : 'Counter API rejected a download') + ' (HTTP ' + res.status + ')');
+        var current = store.get(KEYS.pendingDownloads, []);
+        store.set(KEYS.pendingDownloads, (Array.isArray(current) ? current : []).filter(function (item) { return item.eventId !== entry.eventId; }));
+        applyRemoteDownloadEvent(data, entry.resourceKey);
+        return sendAt(index + 1);
+      });
+    }).catch(function (err) {
+      state.counterApi.error = err.message || 'Some downloads are waiting to sync.';
+      return false;
+    });
+  }
+  return sendAt(0);
+}
+function queueDownloadEvent(item) {
+  var resourceKey = counterResourceKey(item);
+  if (!resourceKey || (state.counterApi.loaded && !state.counterApi.endpoint)) return Promise.resolve(false);
+  var queue = store.get(KEYS.pendingDownloads, []);
+  if (!Array.isArray(queue)) queue = [];
+  if (queue.length >= 5000) {
+    state.counterApi.error = 'The offline download queue is full; reconnect to sync before downloading more.';
+    renderSettings();
+    return Promise.resolve(false);
+  }
+  var entry = { eventId: newCounterEventId(), resourceKey: resourceKey };
+  queue.push(entry);
+  store.set(KEYS.pendingDownloads, queue);
+  if (state.counterApi.endpoint) return flushPendingDownloads();
+  return loadCounterApiConfig().then(function (endpoint) {
+    return endpoint ? flushPendingDownloads() : false;
+  }).catch(function () { return false; });
+}
+function syncDownloadCounter(forceConfig) {
+  return loadCounterApiConfig(!!forceConfig).then(function (endpoint) {
+    if (!endpoint) {
+      renderSettings();
+      return false;
+    }
+    return flushPendingDownloads().then(function () {
+      return fetch(endpoint + '/v1/stats', { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (stats) {
+        if (!res.ok || stats.ok !== true) throw new Error((stats && stats.error ? stats.error : 'Shared download counter is unavailable') + ' (HTTP ' + res.status + ')');
+        applyRemoteDownloadStats(stats);
+        var pending = store.get(KEYS.pendingDownloads, []);
+        state.counterApi.error = Array.isArray(pending) && pending.length
+          ? pending.length + ' download(s) are waiting to sync.' : '';
+        renderCounterViews();
+        return true;
+      });
+    });
+  }).catch(function (err) {
+    state.counterApi.error = err.message || 'Shared download counter could not be reached.';
+    renderSettings();
+    return false;
+  });
 }
 
 function tokenStore() {
@@ -2619,54 +2831,10 @@ function checkRepoAccess() {
   });
 }
 
-/* Shared, encrypted token saved in the repository ---------------------
-   A teacher device can unlock the same publishing token with the admin
-   password, without ever exposing the token in plain text. ------------ */
-function tokenFilePath() {
-  return String(state.settings.dataDir || 'data').replace(/\/+$/, '') + '/cloud-token.json';
-}
-function deriveKey(password, saltB64, iterations) {
-  var enc = new TextEncoder();
-  return crypto.subtle.importKey('raw', enc.encode(String(password)), 'PBKDF2', false, ['deriveKey'])
-    .then(function (base) {
-      return crypto.subtle.deriveKey(
-        { name: 'PBKDF2', salt: new Uint8Array(atob(saltB64).split('').map(function (c) { return c.charCodeAt(0); })), iterations: iterations, hash: 'SHA-256' },
-        base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-    });
-}
-function encryptToken(token, password) {
-  if (!(window.crypto && crypto.subtle)) return Promise.reject(new Error('This browser cannot encrypt the shared token (needs HTTPS or localhost).'));
-  var salt = crypto.getRandomValues(new Uint8Array(16));
-  var iv = crypto.getRandomValues(new Uint8Array(12));
-  var iterations = 150000;
-  var saltB64 = btoa(String.fromCharCode.apply(null, salt));
-  return deriveKey(password, saltB64, iterations).then(function (key) {
-    return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(String(token)));
-  }).then(function (cipher) {
-    return {
-      version: 1, algorithm: 'AES-GCM', kdf: 'PBKDF2-SHA256', iterations: iterations,
-      salt: saltB64,
-      iv: btoa(String.fromCharCode.apply(null, iv)),
-      ciphertext: b64EncodeBytes(new Uint8Array(cipher)),
-      fingerprint: tokenFingerprint(token),
-      savedAt: new Date().toISOString(),
-      savedBy: state.settings.adminUser,
-      note: 'Encrypted copy of the publishing token. Unlocked with the administrator password in the subject cloud.'
-    };
-  });
-}
-function decryptToken(record, password) {
-  if (!record || !record.salt || !record.ciphertext) return Promise.reject(new Error('No saved token file was found in the repository.'));
-  return deriveKey(password, record.salt, record.iterations || 150000).then(function (key) {
-    var iv = new Uint8Array(atob(record.iv).split('').map(function (c) { return c.charCodeAt(0); }));
-    var data = new Uint8Array(atob(record.ciphertext).split('').map(function (c) { return c.charCodeAt(0); }));
-    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, data);
-  }).then(function (plain) {
-    return new TextDecoder().decode(plain);
-  }).catch(function () {
-    throw new Error('That password could not unlock the saved token.');
-  });
-}
+/* A GitHub token is intentionally never written to the repository. This is
+   static JavaScript delivered to every visitor; hiding a token in an admin
+   view or encrypting it with client-side credentials would not make it secret.
+   Keep it only in the administrator's browser, or use a server-side secret. */
 
 /* Library metadata in the cloud --------------------------------------- */
 function resourceForCloud(item) {
@@ -2848,7 +3016,7 @@ function guessCategory(text) {
 /* Cloud activity data (counters + student records + logs) -------------- */
 function cloudDataPayload() {
   return {
-    _comment: 'Counters, student register and activity written by the Mathematics Advanced subject cloud. Read by the site; sensitive only in that it lists issued usernames and passwords.',
+    _comment: 'Optional cloud snapshot. This file is public in a public repository and can contain student names, usernames, plaintext passwords and activity logs. Do not sync sensitive student data here.',
     subject: SUBJECT,
     updatedAt: new Date().toISOString(),
     counters: {
@@ -2934,25 +3102,42 @@ var analyticsPushTimer = null;
 function maybePushAnalytics() {
   if (!state.settings.pushAnalytics || !currentToken() || !repoParts()) return;
   clearTimeout(analyticsPushTimer);
-  analyticsPushTimer = setTimeout(function () { pushCloudData(true); }, 4000);
+  analyticsPushTimer = setTimeout(function () {
+    // This only syncs events generated in the browser holding the token.
+    // The library write carries per-file download totals for other readers.
+    pushCloudData(true);
+    pushLibrary().catch(function (err) {
+      if (window.console && console.warn) console.warn('Could not sync per-file download counts:', err);
+    });
+  }, 4000);
 }
 function pushCloudData(silent) {
   if (!currentToken() || !repoParts()) {
     if (!silent) toast('Save an access token first — counters and records are stored on this device only.', 'warn');
     return Promise.resolve(false);
   }
-  var path = String(state.settings.dataDir || 'data').replace(/\/+$/, '') + '/cloud-data.json';
-  var text = JSON.stringify(cloudDataPayload(), null, 2);
-  return ghGetFile(path).then(function (existing) {
-    return ghPutFile(path, b64EncodeText(text),
-      'Subject cloud: sync counters and student records', existing ? existing.sha : undefined);
-  }).then(function () {
-    if (!silent) toast('Counters and student records pushed to the cloud.', 'success');
-    return true;
-  }).catch(function (err) {
-    if (!silent) toast('Could not push to the cloud: ' + err.message, 'error');
-    return false;
-  });
+  var push = function () {
+    var path = String(state.settings.dataDir || 'data').replace(/\/+$/, '') + '/cloud-data.json';
+    var text = JSON.stringify(cloudDataPayload(), null, 2);
+    return ghGetFile(path).then(function (existing) {
+      return ghPutFile(path, b64EncodeText(text),
+        'Subject cloud: sync counters and student records', existing ? existing.sha : undefined);
+    }).then(function () {
+      if (!silent) toast('Counters and student records pushed to the cloud.', 'success');
+      return true;
+    }).catch(function (err) {
+      if (!silent) toast('Could not push to the cloud: ' + err.message, 'error');
+      return false;
+    });
+  };
+  if (!silent) {
+    return confirmDialog({
+      title: 'Push activity data to public GitHub?',
+      message: 'This writes activity logs and, when present, student names, usernames and plaintext passwords to cloud-data.json. The current repository is public, so anyone can read them. Continue only for non-sensitive test data.',
+      confirmLabel: 'I understand — push the data', danger: true
+    }).then(function (ok) { return ok ? push() : false; });
+  }
+  return push();
 }
 
 /* Upload to the cloud -------------------------------------------------- */
@@ -3064,7 +3249,9 @@ function renderCounters() {
   var pill = $('#visitor-pill');
   if (pill) pill.title = formatCount(state.counters.uniqueVisitors || 0) + ' unique devices · ' + formatCount(state.counters.visitsToday || 0) + ' visits today';
   var dpill = $('#download-pill');
-  if (dpill) dpill.title = formatCount(state.counters.downloadsToday || 0) + ' downloads today';
+  if (dpill) dpill.title = state.counterApi.endpoint
+    ? 'Shared total from all browsers · ' + formatCount(state.counters.downloadsToday || 0) + ' counted today in this browser'
+    : 'This browser only. Configure the shared download counter API to combine users.';
 }
 function renderAll() {
   applyVisibility();
@@ -3369,7 +3556,7 @@ function renderDashboard() {
     kpis.innerHTML = [
       kpiHtml('Registered students', formatCount(students.length), formatCount(activeWeek) + ' active in the last 7 days', 'users', 'kpi--indigo'),
       kpiHtml('Visits', formatCount(state.counters.visits || 0), formatCount(state.counters.visitsToday || 0) + ' today · ' + formatCount(state.counters.uniqueVisitors || 0) + ' devices', 'activity', ''),
-      kpiHtml('File downloads', formatCount(state.counters.downloads || 0), formatCount(state.counters.downloadsToday || 0) + ' today · ' + formatCount(totalStudentDownloads) + ' by students', 'cloud-download', 'kpi--emerald'),
+      kpiHtml('File downloads', formatCount(state.counters.downloads || 0), formatCount(state.counters.downloadsToday || 0) + ' today in this browser · ' + formatCount(totalStudentDownloads) + ' by students on this device', 'cloud-download', 'kpi--emerald'),
       kpiHtml('Resources', formatCount(state.resources.length), state.resources.filter(function (r) { return r.source === 'cloud'; }).length + ' in the cloud · ' + formatBytes(totalBytes), 'folder', 'kpi--amber'),
       kpiHtml('Students active today', formatCount(activeToday), formatCount(blocked) + ' blocked account' + (blocked === 1 ? '' : 's'), 'user-check', 'kpi--indigo'),
       kpiHtml('Never signed in', formatCount(students.filter(function (s) { return !s.visitCount; }).length), 'Registered but no visit recorded', 'clock', 'kpi--rose')
@@ -3381,7 +3568,13 @@ function renderDashboard() {
     var pieces = [];
     if (repo) {
       pieces.push('Repository <b>' + esc(repo.full) + '</b> (' + esc(state.settings.branch || 'main') + ')');
-      pieces.push(currentToken() ? 'access token saved' : '<b>no access token</b> — uploads stay on this device');
+      pieces.push(currentToken()
+        ? 'write token is stored in this browser only'
+        : '<b>read-only on this browser</b> — its registrations and activity stay local');
+      pieces.push(state.counterApi.endpoint
+        ? 'shared download counter connected' + (state.counterApi.lastSync ? ' · synced ' + esc(relativeTime(state.counterApi.lastSync)) : '')
+        : '<b>shared download counter not configured</b> — download totals are local to each browser');
+      if (state.counterApi.error) pieces.push('<b>' + esc(state.counterApi.error) + '</b>');
       pieces.push(state.cloud.lastSync ? 'last cloud sync ' + esc(relativeTime(state.cloud.lastSync)) : 'not synced yet');
     } else {
       pieces.push('No repository configured — everything is stored in this browser. Add the repository and access token in Cloud settings to publish to the cloud.');
@@ -3681,6 +3874,18 @@ function renderSettings() {
   $('#data-downloads').textContent = formatCount(state.counters.downloads || 0);
   $('#data-visits').textContent = formatCount(state.counters.visits || 0);
   $('#data-size').textContent = formatBytes(store.size());
+  var counterEndpoint = $('#download-counter-endpoint');
+  if (counterEndpoint && !counterEndpoint.value) counterEndpoint.value = state.counterApi.endpoint || '';
+  var counterStatus = $('#download-counter-status');
+  if (counterStatus) {
+    counterStatus.textContent = state.counterApi.endpoint ? 'Connected' : 'Not configured';
+    counterStatus.className = 'tag ' + (state.counterApi.endpoint ? 'tag--emerald' : 'tag--amber');
+  }
+  var counterError = $('#download-counter-error');
+  if (counterError) {
+    counterError.hidden = !state.counterApi.error;
+    counterError.textContent = state.counterApi.error || '';
+  }
 }
 function setSwitch(sel, value) {
   var el = $(sel);
@@ -3819,12 +4024,15 @@ function downloadResource(id) {
   }
   var student = currentStudent();
   toast('Preparing ' + item.fileName + '…', 'info');
-  recordDownload(item, student);
-  renderCounters();
-  if (state.view === 'library') renderLibrary();
-  else if (currentAdmin()) renderDashboard();
   fetchFileBlob(item).then(function (blob) {
     downloadBlob(item.fileName, blob);
+    // Count only after the file was fetched successfully, not on a failed click.
+    recordDownload(item, student);
+    queueDownloadEvent(item);
+    renderCounters();
+    if (state.view === 'library') renderLibrary();
+    else if (state.view === 'my-learning') renderMyLearning();
+    else if (currentAdmin()) renderDashboard();
     toast('Downloaded ' + item.fileName + (state.counters.downloadsToday ? ' · ' + state.counters.downloadsToday + ' downloads today' : ''), 'success');
   }).catch(function (err) {
     var urls = resourceUrls(item);
@@ -3832,6 +4040,14 @@ function downloadResource(id) {
       var a = document.createElement('a');
       a.href = urls.raw; a.download = item.fileName; a.target = '_blank'; a.rel = 'noopener';
       document.body.appendChild(a); a.click(); a.remove();
+      // The cross-origin fallback was handed to the browser; record this
+      // fallback attempt because the page cannot observe its completion.
+      recordDownload(item, student);
+      queueDownloadEvent(item);
+      renderCounters();
+      if (state.view === 'library') renderLibrary();
+      else if (state.view === 'my-learning') renderMyLearning();
+      else if (currentAdmin()) renderDashboard();
       toast('Opened ' + item.fileName + ' in a new tab — download failed in the browser (' + err.message + ').', 'warn');
     } else {
       toast(err.message, 'error');
@@ -4218,6 +4434,42 @@ function deleteToken() {
     toast('Saved access token deleted from this browser.', 'success');
   });
 }
+function saveCounterApiEndpoint() {
+  if (!currentAdmin()) return openAdminAuth();
+  var input = $('#download-counter-endpoint');
+  var endpoint;
+  try { endpoint = normalizeCounterApiEndpoint(input ? input.value : ''); }
+  catch (err) {
+    state.counterApi.error = err.message;
+    renderSettings();
+    toast(err.message, 'error');
+    return;
+  }
+  var repo = repoParts();
+  if (!repo) { toast('Save the GitHub repository location first.', 'warn'); return; }
+  if (!currentToken()) { toast('Save the admin GitHub token first so this public endpoint URL can be written to the repository.', 'warn'); return; }
+  var path = downloadCounterConfigPath();
+  var payload = JSON.stringify({
+    _comment: 'Public configuration only. Set endpoint to the deployed Cloudflare Worker URL; never put secrets or GitHub tokens here.',
+    endpoint: endpoint
+  }, null, 2);
+  ghGetFile(path).then(function (existing) {
+    return ghPutFile(path, b64EncodeText(payload), 'Configure shared download counter API', existing ? existing.sha : undefined);
+  }).then(function () {
+    state.counterApi.endpoint = endpoint;
+    state.counterApi.loaded = true;
+    state.counterApi.error = '';
+    if (!endpoint) store.set(KEYS.pendingDownloads, []);
+    if (input) input.value = endpoint;
+    renderSettings();
+    toast(endpoint ? 'Shared download counter endpoint saved. Checking the service…' : 'Shared download counter endpoint cleared.', 'success');
+    if (endpoint) return syncDownloadCounter();
+  }).catch(function (err) {
+    state.counterApi.error = err.message || 'Could not save the counter API endpoint.';
+    renderSettings();
+    toast('Could not save the counter API endpoint: ' + state.counterApi.error, 'error');
+  });
+}
 function saveCloudSettings() {
   state.settings.repo = ($('#repo-input').value || '').trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   state.settings.branch = ($('#branch-input').value || 'main').trim() || 'main';
@@ -4304,12 +4556,14 @@ function cloudSyncNow(silent) {
     state.cloud.loading = false;
     state.cloud.lastSync = new Date().toISOString();
     state.cloud.error = '';
-    renderAll();
-    if (!silent) {
-      var info = results[0];
-      toast('Cloud library refreshed' + (info && info.total ? ' — ' + info.total + ' published file(s).' : '.') , 'success');
-    }
-    return results;
+    return syncDownloadCounter(true).then(function () {
+      renderAll();
+      if (!silent) {
+        var info = results[0];
+        toast('Cloud library refreshed' + (info && info.total ? ' — ' + info.total + ' published file(s).' : '.') , 'success');
+      }
+      return results;
+    });
   }).catch(function (err) {
     state.cloud.loading = false;
     state.cloud.error = err.message;
@@ -4430,7 +4684,7 @@ function renderStudentAuth() {
           '<input class="input" id="sa-user" autocomplete="username" placeholder="e.g. peter" required></div>' +
         '<div class="field"><label for="sa-pass">Password</label>' +
           '<input class="input" id="sa-pass" type="password" autocomplete="current-password" placeholder="e.g. peter11" required></div>' +
-        '<p class="hint">Your password is your username followed by your year level number (peter + 11 → peter11).</p>' +
+        '<p class="hint">Your password is your username followed by your year level number (peter + 11 → peter11). Accounts on this static site are saved only in the browser that registered them.</p>' +
         (auth.error ? '<p class="field-error mt-2">' + esc(auth.error) + '</p>' : '') +
         '<button type="submit" class="btn btn--emerald btn--block btn--lg mt-3">' + svgIcon('log-in', 'ico--sm') + ' Log in</button>' +
         '<p class="hint mt-3">No account yet? Choose <b>Register</b> above — it takes one step.</p>' +
@@ -4450,6 +4704,7 @@ function renderStudentAuth() {
           '<div class="notice notice--info">' +
             '<div>The system will give you a <b>username</b> (your first name) and a <b>password</b> (your name + year level).</div>' +
           '</div>' +
+          '<div class="notice notice--warn mt-3"><div><b>This is device-local registration.</b> This static site cannot share your account with another browser. Ask your teacher if you need to use a different device.</div></div>' +
           (auth.error ? '<p class="field-error mt-2">' + esc(auth.error) + '</p>' : '') +
           '<button type="submit" class="btn btn--emerald btn--block btn--lg mt-3">' + svgIcon('user-plus', 'ico--sm') + ' Register and get my login</button>' +
         '</form>';
@@ -4460,7 +4715,7 @@ function renderStudentAuth() {
     openModal({
       name: 'student-auth', icon: 'graduation-cap', badge: 'emerald',
       title: auth.result ? 'Registration complete' : 'Student access',
-      subtitle: auth.result ? 'Your Mathematics Advanced cloud account is ready.' : 'Register with your first name and year level, or log in with the details the system gave you.',
+      subtitle: auth.result ? 'Your account is saved in this browser.' : 'Register with your first name and year level, or log in with the details saved in this browser.',
       size: 'sm', body: body, actions: []
     });
   } else {
@@ -4489,7 +4744,8 @@ function submitStudentRegister(event) {
   event.preventDefault();
   try {
     var student = registerStudent($('#sr-name').value, $('#sr-year').value);
-    recordVisit();
+    // Registration happens within the page visit already counted at startup.
+    recordStudentVisit(student);
     state.authModal.result = { username: student.username, password: student.password, year: student.year };
     state.authModal.error = '';
     renderAll();
@@ -4674,7 +4930,7 @@ function openHelp() {
         '<li>Monitor registrations, visits and downloads in the dashboard.</li>' +
         '<li>Export CSVs for records, or back up everything as JSON.</li></ol></div>' +
     '</div>' +
-    '<div class="notice notice--info mt-4"><div><b>Note on privacy:</b> this is a static site. Student records live in the browser that collects them and, when an access token is saved, are synced to the repository so other devices can read them.</div></div>',
+    '<div class="notice notice--warn mt-4"><div><b>Sharing and privacy:</b> this is a static site. Student accounts and activity are browser-local unless a token-holding browser writes them to GitHub. This repository is public, so cloud-synced names, passwords and logs are readable by anyone. For safe shared registration and analytics, use a server-side backend; never publish the GitHub token.</div></div>',
     actions: [{ label: 'Close', action: 'modal-close', variant: 'btn--outline' }]
   });
 }
@@ -4933,6 +5189,14 @@ var ACTIONS = {
   'delete-token': function () { deleteToken(); },
   'save-cloud': function () { saveCloudSettings(); },
   'detect-repo': function () { detectRepo(); },
+  'save-counter-api': function () { saveCounterApiEndpoint(); },
+  'sync-counter-api': function () {
+    syncDownloadCounter(true).then(function (ok) {
+      if (ok) toast('Shared download totals refreshed.', 'success');
+      else if (state.counterApi.error) toast(state.counterApi.error, 'error');
+      else toast('Deploy the Cloudflare Worker and save its URL first.', 'warn');
+    });
+  },
   'sync-cloud': function () { cloudSyncNow(false); },
   'push-cloud': function () { pushCloudData(false); },
   'save-options': function () { saveOptions(); },
@@ -5086,7 +5350,10 @@ function wireEvents() {
     }
   });
 
-  window.addEventListener('online', updateConnectionState);
+  window.addEventListener('online', function () {
+    updateConnectionState();
+    if (repoParts()) syncDownloadCounter();
+  });
   window.addEventListener('offline', updateConnectionState);
   window.addEventListener('beforeunload', function () { saveSession(); });
 }
@@ -5111,8 +5378,19 @@ function refreshRelativeTimes() {
   if (state.view === 'dashboard') { renderStudentTable(); renderFeeds(); renderAnalytics(); renderFilesTable(); }
   else if (state.view === 'my-learning') renderMyLearning();
   renderCounters();
+  if (state.counterApi.endpoint && state.cloud.online) syncDownloadCounter();
 }
 function init() {
+  // The previous release enabled public analytics writes by default. Reset that
+  // inherited default once so existing browsers do not publish student
+  // credentials without an explicit opt-in to the new privacy warning.
+  var savedSettings = store.get(KEYS.settings, null);
+  if (savedSettings && (!savedSettings.version || savedSettings.version === 'v2.0.0')) {
+    state.settings.pushAnalytics = false;
+    state.settings.version = APP_VERSION;
+    saveSettings();
+  }
+
   var vers = $('#app-version');
   if (vers) vers.textContent = APP_VERSION;
   var fvers = $('#footer-version');
@@ -5145,10 +5423,14 @@ function init() {
   renderAll();
   showView(state.view || 'library');
 
-  if (state.settings.cloudSync && repoParts()) {
-    cloudSyncNow(true).then(function () {
-      if (state.settings.pushAnalytics && currentToken()) maybePushAnalytics();
-    });
+  if (repoParts()) {
+    if (state.settings.cloudSync) {
+      cloudSyncNow(true).then(function () {
+        if (state.settings.pushAnalytics && currentToken()) maybePushAnalytics();
+      });
+    } else {
+      syncDownloadCounter();
+    }
   }
   setInterval(refreshRelativeTimes, 60000);
   if (!repoParts()) {

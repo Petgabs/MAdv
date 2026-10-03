@@ -14,9 +14,17 @@ subject cloud for one teacher and their classes:
   password, last visit time, how many times they visited and exactly which
   files they downloaded — plus visitor and per-file download counters.
 
-Everything lives in **one `index.html`**. There is no build step, no `npm`, no
-database and no server to keep running. JavaScript, CSS and icons are all
-inline, so the page works offline and on locked-down school networks.
+The student-facing front end remains a single **`index.html`** with no frontend
+build step; its JavaScript, CSS and icons are inline. The optional shared
+download counter is a separately deployed Cloudflare Worker + D1 service in
+`cloudflare/`. Without that service, the page still works, but counters and
+registrations are browser-local.
+
+**Important static-site limitation:** GitHub Pages cannot accept anonymous writes.
+Registrations and visitor activity created in a browser remain local. Shared
+student accounts and global visitor tracking still require a suitable backend.
+The admin's GitHub token stays in that admin browser; never commit it or hide it
+in the admin page—every visitor can download and inspect the page.
 
 ---
 
@@ -36,7 +44,7 @@ devices automatically find the shared library.
 | Step | What to do |
 | --- | --- |
 | 1 | Open the site and click **Admin**. Sign in with **`peter82`** / **`petgabs82`** (change these in Cloud settings → *Administrator sign-in*). |
-| 2 | **Cloud settings → Access token**: create a GitHub *fine-grained personal access token* scoped to **only this repository** with the single permission **Contents: Read and write**, paste it and press **Save access token** (then **Test connection**). |
+| 2 | **Cloud settings → Access token**: create a GitHub *fine-grained personal access token* scoped to **only this repository** with the single permission **Contents: Read and write**, paste it and press **Save access token** (then **Test connection**). The token stays in that admin browser only; never copy it into GitHub files or the shared page. |
 | 3 | **Cloud settings → Cloud location**: check the repository (`owner/name`), branch, upload folder (`resources`) and data folder (`data`). Press **Detect this repository** if the box is empty. |
 | 4 | **Upload Resource**: choose the file, give it a name, then set **Year level**, **Topic** and **Resource type**. Press **Upload resource**. |
 | 5 | Repeat for every resource. The library, `library.json` and student downloads update instantly. |
@@ -52,11 +60,15 @@ stored only in the browser that uploaded them and are marked *This device only*.
 3. The system issues and displays their credentials:
    * **Username** = the student's first name (a number is added if the name is taken: `peter`, `peter2`, …)
    * **Password** = username + year level number (`peter` + `Year 11` → `peter11`)
-4. They use those details on the **Log in** tab from then on, and download
-   whatever the teacher has published.
+4. They can use those details on the **Log in** tab in the same browser.
 
-Students can be blocked, deleted or password-reset from the admin page at any
-time; blocked accounts see a message asking them to speak to the teacher.
+**Registrations are device-local in this static version.** A student who registers
+on one phone/browser will not be able to sign in from another device. The admin
+cannot remotely pull that registration: only data already present in the
+admin's token-bearing browser can be pushed to GitHub. Shared accounts require
+a server-side API. Students can be blocked, deleted or password-reset from the
+admin page on the browser that has the register; blocked accounts see a message
+asking them to speak to the teacher.
 
 ## 4. Classifying resources
 
@@ -92,40 +104,88 @@ option everywhere.
   list as CSV; download or restore a full JSON backup; print a monitoring
   report; reset counters; clear logs; wipe this device.
 
-## 6. Counters
+## 6. Counters and cloud sync
 
-* **Visitor counter** (header + footer) — total visits, unique devices and
-  today's visits, tracked per device with a 30-minute anti-refresh window.
-* **Download counter** — a global total, a per-file counter on every card and
-  in the admin file table, plus per-student download totals.
+* **Visitor counter** (header + footer) — remains browser-local, with a
+  per-device 30-minute anti-refresh window.
+* **Download counter** — records after the file is fetched and can be shared
+  across browsers through the optional Cloudflare Worker + D1 service below.
+  Without that service configured, it remains browser-local. Per-student
+  totals and student histories remain local.
+* The download API receives only a stable resource key and a one-time event ID.
+  It does not receive student names, passwords, or the GitHub token. A limited
+  offline queue retries downloads when connectivity returns. Public counters
+  are approximate and may be abused by automated requests.
+* The old GitHub analytics option is separate and opt-in; it writes student
+  details and plaintext passwords to the public repository. Leave it disabled
+  for real student information.
 
-When an access token is saved, counters and student records are also written to
-`data/cloud-data.json` and merged back on other devices, so the numbers reflect
-the whole class rather than a single browser.
+### Configure the shared download counter (Cloudflare)
+
+1. Install Node.js and Wrangler, then authenticate with your Cloudflare account
+   locally using `npx wrangler login` (do not paste credentials into chat).
+2. From the repository root, run `cd cloudflare` and
+   `npx wrangler d1 create madv-download-counter`. Copy the returned database
+   ID into `wrangler.toml` in that directory, replacing
+   `REPLACE_WITH_D1_DATABASE_ID`. If your Pages site uses a custom domain, also
+   update `ALLOWED_ORIGIN` there to that site's origin.
+3. Apply the schema and create a private rate-limit secret:
+   `npx wrangler d1 migrations apply madv-download-counter --remote`, then
+   `npx wrangler secret put RATE_LIMIT_SECRET` and enter a random secret of at
+   least 32 characters when prompted. Keep it out of Git.
+4. Deploy with `npx wrangler deploy`. The command prints a public
+   `workers.dev` URL; the URL is not a secret.
+5. Publish the front-end changes to GitHub Pages. Sign in as admin, open
+   **Cloud settings → Shared download counter**, enter the Worker URL and press
+   **Save endpoint to GitHub**. That saves only the URL in
+   `data/download-counter.json`; the GitHub token stays in the admin browser.
+6. Press **Test / refresh shared totals**. After configuration, every browser
+   pulls the same D1 totals and submits a counter event after a successful file
+   fetch. No GitHub token is sent to the Worker.
+
+The Worker rate-limits by a temporary HMAC of Cloudflare's connecting IP and
+cleans up rate-limit/event IDs; it does not store raw IP addresses. The D1
+aggregate totals persist. Shared student registration and visitor counts still
+need their own backend and are not provided by this download-only API.
 
 ## 7. Where things are stored
 
 | Data | Location |
 | --- | --- |
-| Uploaded files (published) | the GitHub repository, folder `resources/<Year level>/…` |
-| Resource list | `library.json` in the repository |
-| Counters, student register, logs | `data/cloud-data.json` in the repository **and** each browser's `localStorage` |
-| Files uploaded without a token | the browser's IndexedDB (this device only) |
-| Access token | `localStorage` (or this tab's `sessionStorage` if *Forget when the tab closes* is ticked) — never written into the HTML file |
+| Uploaded files (published) | The GitHub repository, folder `resources/<Year level>/…` |
+| Resource list and fallback per-file totals | `library.json` in the repository |
+| Shared download totals (when configured) | Cloudflare D1, written through the Worker; no GitHub token is involved |
+| Public counter API URL | `data/download-counter.json` in the repository; URL only, no secrets |
+| Local counters, student register, logs and pending download retries | Each browser's `localStorage` |
+| Optional pushed counters, student register and logs | `data/cloud-data.json` in the repository; only the browser holding the admin token can write it |
+| Files uploaded without a token | The uploading browser's IndexedDB (this device only) |
+| Access token | Admin browser `localStorage` (or tab `sessionStorage` if *Forget when the tab closes* is ticked); never written to the HTML or repository |
 
-### Honest security note
+### Security and privacy note
 
-This is a static site: it has no server, so login is a convenience gate rather
-than hard access control. Anyone who can view the repository can read the files
-and the issued passwords. Use a **public** repository for the shared library,
-keep the publishing token to the *Contents: Read and write* permission of that
-one repository, and never commit personal or sensitive student information.
+The current `Petgabs/MAdv` repository is **public**. Anyone can read
+`data/cloud-data.json`. If cloud analytics is enabled, that file includes
+student names, usernames, plaintext passwords, and activity logs. The setting
+is off by default to avoid publishing student credentials; do not enable it for
+real student information. The deterministic username-plus-year passwords are
+not secure authentication.
+
+This is a static site: its admin login is a convenience gate, not server-side
+access control. A GitHub Contents: Read and write token can modify or delete
+repository contents. Hiding a token in an admin screen, encrypting it in
+client-side JavaScript, or saving it in a public repo does not protect it—all
+site visitors can inspect downloaded code/data. Keep the token only in the
+admin browser for publishing, or use a backend/serverless function that stores
+the token as a server-side secret and authenticates writes. Do not commit
+personal or sensitive student information to this public repository.
 
 ## 8. Troubleshooting
 
 | Symptom | Fix |
 | --- | --- |
-| Students can't see uploaded files | Save the access token and re-upload; check that the repository is public and that Pages is deployed. |
+| Students can't see uploaded files | Check that the repository is public, Pages is deployed, and `library.json` lists the file. A token is needed only in the admin browser to publish it. |
+| Student cannot log in from a second browser/device | Expected for this static version: registration is stored in the registering browser. Add a backend for shared accounts. |
+| Downloads do not share across browsers | Deploy the Cloudflare Worker/D1 service, save its HTTPS URL in **Cloud settings → Shared download counter**, and check the Worker health endpoint. Visitor counts and student registrations remain local. |
 | "Cloud library could not be refreshed" | Check the repository name in Cloud settings; wait a minute after committing (raw GitHub caching); press **Try again**. |
 | Token rejected (HTTP 401/403) | Create a new fine-grained token with **Contents: Read and write**, save it again. |
 | File too large | Raise *Maximum upload size* in Cloud settings (keep files under ~95 MB; GitHub rejects files over 100 MB). |
