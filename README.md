@@ -256,8 +256,65 @@ add an option everywhere.
 | Supabase address (URL + publishable key, both public) | `data/sync-config.json` in the repository, and cached in each browser |
 | Repository mirror of the register and activity snapshot | `data/cloud-data.json` — names, usernames and counts, **no passwords**; not authoritative for Abacus totals |
 | Local working copy: students, logs, cached counters, settings, offline queues | Each browser's `localStorage` |
+| Student sign-in session | Each browser's `localStorage` (remembered between lessons) |
+| **Administrator sign-in session** | Tab `sessionStorage` only — closing the tab ends admin access |
 | Files uploaded without a token | The uploading browser's IndexedDB (this device only) |
+| Downloaded files, cached for 10 minutes | The browser's IndexedDB (`madv-files` → `cache`), ~120 MB oldest-first cap |
+| Sign-in lockout counter and diagnostics | Each browser's `localStorage` (this device only) |
 | Access token | Admin browser `localStorage` (or tab `sessionStorage` if *Forget when the tab closes* is ticked); never written to the HTML or repository |
+
+### Hardening for classroom load
+
+The site is built for a whole class arriving at once — thirty sign-ins at 9:00,
+thirty clicks on the same past paper, thirty tabs reconnecting after the Wi-Fi
+drops.
+
+**Sign-in protection**
+
+* **Brute-force lockout.** Five failed sign-ins (student *or* administrator)
+  pause sign-in on that device for 60 seconds. Each further group of five
+  doubles the pause — 2, 4, 8 minutes — up to a 15 minute ceiling. Any
+  successful sign-in clears the history. The pause is per device, so one
+  student guessing cannot lock the class out.
+* **Admin inactivity sign-out.** The admin area signs itself out after a
+  period of inactivity — 60 minutes by default, set anywhere from 1 to 480
+  minutes, or **0 to never**, in *Cloud settings → Behaviour & defaults*.
+* **Admin sessions are tab-scoped.** An admin session is no longer written to
+  `localStorage`; closing the tab (or leaving the laptop overnight) ends it.
+  Student sessions are still remembered between lessons.
+* **Content-Security-Policy.** A host allowlist with `object-src`, `base-uri`,
+  `worker-src` and `form-action` all set to `'none'`.
+
+**Speed and stability under load**
+
+* **Login retry with jittered backoff.** A transient backend failure (a rate
+  limit at 9:00, a timeout, a dropped connection) is retried once
+  automatically, after a randomised delay so thirty devices do not land on the
+  same second. A real refusal — wrong password, blocked account — is never
+  retried.
+* **Downloads** have a 30 second timeout and one retry, run at most **three at
+  a time per device** with the rest queued in order, and concurrent clicks on
+  the *same* file share a single fetch.
+* **Durable download cache.** Files are cached for 10 minutes in memory and in
+  IndexedDB (oldest-first eviction past roughly 120 MB), so a class downloading
+  the same paper gets it instantly and keeps working if the file host slows
+  down. The cache key carries the file's revision, so a replaced file is never
+  served stale.
+* **Backend friendliness.** The offline event queue stops draining after a
+  transient failure and cools down — 30 seconds, doubling to 5 minutes, with
+  jitter — instead of hammering Supabase when thirty devices reconnect at
+  once. Nothing is discarded: events stay durably queued.
+
+**Crash resistance**
+
+* **Global error shield.** Script errors and unhandled promise rejections are
+  caught; the page keeps working and the event is recorded in *Cloud settings →
+  **Diagnostics*** (last 25, with a one-click clear).
+* Every button action and every renderer runs in isolation, so one broken piece
+  can never blank the page.
+* Toast notifications are flood controlled (repeats collapse into a counter,
+  the stack is capped) and a hidden tab skips re-rendering while its data keeps
+  refreshing.
 
 ### Security and privacy note
 
@@ -300,6 +357,10 @@ sync** to publish counters only.
 | Token rejected (HTTP 401/403) | Create a new fine-grained token with **Contents: Read and write**, save it again. |
 | File too large | The maximum upload is **50 MB per file** (adjustable down to 1 MB in *Cloud settings → Maximum upload size*). Compress the file, split it, or bundle several files into a ZIP. |
 | Wrong password after renaming | Use **Reset password** on the row — it restores the *username + year* rule. |
+| "Too many failed sign-in attempts" | The device paused sign-in after five wrong passwords. Wait for the stated time; any successful sign-in clears it. It is per device, not per account. |
+| The admin area signed itself out | That is the inactivity timeout (60 minutes by default). Change it, or set it to 0 for never, in *Cloud settings → Behaviour & defaults*. Admin sessions also end when the tab is closed. |
+| Something on the page misbehaved | Open *Cloud settings → **Diagnostics***. Script errors and failed background tasks are recorded there instead of breaking the page. |
+| A download is slow with the whole class clicking | Downloads are capped at three at a time per device and cached for 10 minutes, so later clicks on the same file are instant. Wait for the queue rather than reloading. |
 
 ## 10. For developers
 
