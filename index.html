@@ -497,6 +497,8 @@ table.data th.num{text-align:right}
 .toast--info .ico{color:var(--indigo-600)}
 .toast__close{margin-left:auto;background:none;border:0;color:var(--slate-400);cursor:pointer;padding:.1rem;border-radius:var(--radius-sm)}
 .toast__close:hover{color:var(--slate-700)}
+.toast__count{align-self:center;font-size:.72rem;font-weight:700;color:var(--slate-500);
+  background:var(--slate-100);border-radius:999px;padding:.05rem .4rem}
 
 /* ---------- 14. Views, empty & loading states ---------- */
 .view{display:none}
@@ -1796,6 +1798,14 @@ table.data th.num{text-align:right}
                 <input class="input" id="opt-year-list" type="text" placeholder="Year 9, Year 10, Year 11, Year 12">
               </div>
             </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="opt-admin-idle">Sign the admin area out after (minutes idle)</label>
+                <input class="input" id="opt-admin-idle" type="number" min="0" max="480" step="1" value="60">
+                <p class="hint">Between 1 and 480 minutes, or <b>0</b> to never sign out automatically. The admin session also ends when the browser tab is closed.</p>
+              </div>
+              <div class="field"></div>
+            </div>
             <div class="row row--wrap">
               <button type="button" class="btn btn--dark" data-action="save-options">
                 <svg class="ico ico--sm" aria-hidden="true"><use href="#i-save"/></svg> Save behaviour
@@ -1833,6 +1843,26 @@ table.data th.num{text-align:right}
               </button>
             </div>
             <p class="hint mt-2">Changing these affects this browser and the gate on the shared register export. If you change them, store the same values as <code>ADMIN_USER</code> / <code>ADMIN_PASS</code> repository secrets so the scheduled workflow can still read the register.</p>
+          </div>
+        </section>
+
+        <!-- Diagnostics -->
+        <section class="panel mb-6" aria-labelledby="diagnostics-heading">
+          <div class="panel__head">
+            <div>
+              <h3 id="diagnostics-heading">Diagnostics</h3>
+              <p>Problems the page caught and recovered from, newest first. The last 25 are kept on this device.</p>
+            </div>
+            <span class="tag" id="diagnostics-tag">None</span>
+          </div>
+          <div class="panel__body">
+            <div id="diagnostics-list" class="stack text-sm"></div>
+            <div class="row row--wrap mt-4">
+              <button type="button" class="btn btn--outline" data-action="clear-diagnostics">
+                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-trash"/></svg> Clear diagnostics
+              </button>
+            </div>
+            <p class="hint mt-2">A script error or a failed background request is recorded here instead of breaking the page. If students report something odd, read this list before clearing it.</p>
           </div>
         </section>
 
@@ -1918,7 +1948,7 @@ table.data th.num{text-align:right}
 'use strict';
 
 /* ---------------------------- 1. Configuration --------------------------- */
-var APP_VERSION   = 'v2.3.0';
+var APP_VERSION   = 'v2.4.0';
 var SUBJECT       = 'Mathematics Advanced';
 var DEFAULT_ADMIN = { user: 'peter82', pass: 'petgabs82' };
 // One uploaded file is capped at 50 MB. Teachers can lower the limit in Cloud
@@ -1973,6 +2003,25 @@ var EXT_KIND = {
   png: 'document', jpg: 'document', jpeg: 'document', gif: 'document', svg: 'document', webp: 'document',
   zip: 'document', mp4: 'document', mp3: 'document'
 };
+/* --- Security, resilience and classroom-load limits ---------------------
+   These govern how the page behaves when a whole class signs in, downloads
+   the same file, or reconnects at once, and how it protects the admin area. */
+var AUTH_FAIL_THRESHOLD      = 5;                // failed sign-ins before this device pauses
+var AUTH_LOCK_BASE_MS        = 60 * 1000;        // first pause: 60 seconds
+var AUTH_LOCK_MAX_MS         = 15 * 60 * 1000;   // doubling stops at 15 minutes
+var ADMIN_IDLE_DEFAULT_MIN   = 60;               // admin area signs out after an hour idle
+var ADMIN_IDLE_MAX_MIN       = 480;              // 8 hours is the highest configurable value
+var ADMIN_IDLE_CHECK_MS      = 15 * 1000;
+var LOGIN_RETRY_BASE_MS      = 400;              // one jittered retry for a transient backend blip
+var DOWNLOAD_TIMEOUT_MS      = 30 * 1000;
+var DOWNLOAD_MAX_PARALLEL    = 3;                // per device, the rest queue in order
+var DOWNLOAD_CACHE_TTL_MS    = 10 * 60 * 1000;
+var DOWNLOAD_CACHE_MAX_BYTES = 120 * 1024 * 1024;
+var SYNC_COOLDOWN_MIN_MS     = 30 * 1000;        // back off instead of hammering the backend
+var SYNC_COOLDOWN_MAX_MS     = 5 * 60 * 1000;
+var DIAGNOSTICS_MAX          = 25;
+var TOAST_MAX                = 4;
+var TOAST_LIFE_MS            = 6000;
 var KEYS = {
   students: 'madv.students.v2',
   resources: 'madv.resources.v2',
@@ -1986,7 +2035,10 @@ var KEYS = {
   pendingSync: 'madv.pending-sync.v1',
   pendingAbacus: 'madv.abacus-pending.v1',
   syncConfig: 'madv.sync-config.v1',
-  registrationAttempt: 'madv.registration-attempt.v1'
+  registrationAttempt: 'madv.registration-attempt.v1',
+  authLock: 'madv.auth-lock.v1',
+  diagnostics: 'madv.diagnostics.v1',
+  downloadCache: 'madv.download-cache.v1'
 };
 var DEFAULT_SETTINGS = {
   repo: '',
@@ -2011,6 +2063,8 @@ var DEFAULT_SETTINGS = {
   years: DEFAULT_YEARS.slice(),
   adminUser: DEFAULT_ADMIN.user,
   adminPass: DEFAULT_ADMIN.pass,
+  // Minutes of inactivity before the admin area signs itself out. 0 = never.
+  adminIdleMinutes: ADMIN_IDLE_DEFAULT_MIN,
   version: APP_VERSION
 };
 
@@ -2070,12 +2124,13 @@ var state = {
   resources: store.get(KEYS.resources, []),
   logs: Object.assign(defaultLogs(), store.get(KEYS.logs, {})),
   counters: Object.assign(defaultCounters(), store.get(KEYS.counters, {})),
-  session: store.get(KEYS.session, null),
+  session: readStoredSession(),
   cloud: { repo: '', branch: 'main', token: '', sessionOnly: false, librarySha: null, dataSha: null,
            lastSync: null, online: true, error: '', checked: false, login: '' },
   sync: { provider: 'supabase', url: '', key: '', loaded: false, loading: null, status: 'off',
           lastSync: null, rosterAt: null, rosterLoading: false, rosterPromise: null,
-          error: '', pending: 0, flushing: false, fromRepo: false },
+          error: '', pending: 0, flushing: false, fromRepo: false,
+          cooldownUntil: 0, cooldownMs: 0 },
   abacus: { status: 'checking', lastSync: null, error: '', pending: 0, loading: null, flushing: false,
             initialized: { visits: false, downloads: false, files: {}, students: {}, studentFiles: {} },
             inFlight: { visits: 0, downloads: 0, files: {}, students: {}, studentFiles: {} },
@@ -2092,6 +2147,7 @@ var state = {
   authModal: { tab: 'login', error: '', notice: '', result: null, registrationCheckFailed: false },
   adminAuthError: '',
   busy: false,
+  renderPending: false, // a hidden tab skipped a redraw; catch up when it returns
   transport: 'device'   // 'cloud' when the repository is reachable
 };
 // The download policy is fixed: a visitor must register/sign in as a student and
@@ -2115,9 +2171,53 @@ function saveStudents() { store.set(KEYS.students, state.students); }
 function saveResources() { store.set(KEYS.resources, state.resources); }
 function saveLogs() { store.set(KEYS.logs, state.logs); }
 function saveCounters() { state.counters.updatedAt = new Date().toISOString(); store.set(KEYS.counters, state.counters); }
-function saveSession() { state.session ? store.set(KEYS.session, state.session) : store.remove(KEYS.session); }
+/* Sessions ---------------------------------------------------------------
+   A student session is remembered on the device so a class does not have to
+   sign in every lesson. An administrator session is deliberately tab-scoped:
+   it lives in sessionStorage only, so closing the tab (or the laptop lid
+   overnight) ends admin access instead of leaving the register open. */
+function sessionScratch() {
+  try { return window.sessionStorage || null; } catch (err) { return null; }
+}
+function readStoredSession() {
+  var scratch = sessionScratch();
+  if (scratch) {
+    try {
+      var raw = scratch.getItem(KEYS.session);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.role) return parsed;
+      }
+    } catch (err) { /* unreadable scratch copy */ }
+  }
+  var saved = store.get(KEYS.session, null);
+  if (saved && saved.role === 'admin') {
+    // A pre-upgrade admin session left on disk. Discard it rather than honour it.
+    store.remove(KEYS.session);
+    return null;
+  }
+  return saved || null;
+}
+function saveSession() {
+  var scratch = sessionScratch();
+  if (!state.session) {
+    store.remove(KEYS.session);
+    if (scratch) { try { scratch.removeItem(KEYS.session); } catch (err) {} }
+    return;
+  }
+  if (state.session.role === 'admin') {
+    store.remove(KEYS.session);
+    if (scratch) { try { scratch.setItem(KEYS.session, JSON.stringify(state.session)); } catch (err) {} }
+    return;
+  }
+  store.set(KEYS.session, state.session);
+  if (scratch) { try { scratch.setItem(KEYS.session, JSON.stringify(state.session)); } catch (err) {} }
+}
 
 /* --------------------------------- IndexedDB ------------------------------ */
+// 'files'  — originals uploaded on this device (admin side).
+// 'cache'  — short-lived copies of downloaded files so a whole class fetching
+//            the same paper hits the disk instead of the file host.
 var fileStore = {
   db: null,
   open: function () {
@@ -2125,53 +2225,253 @@ var fileStore = {
     if (self.db) return Promise.resolve(self.db);
     return new Promise(function (resolve, reject) {
       if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB unavailable'));
-      var req = indexedDB.open('madv-files', 1);
-      req.onupgradeneeded = function () { req.result.createObjectStore('files'); };
+      var req = indexedDB.open('madv-files', 2);
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains('files')) db.createObjectStore('files');
+        if (!db.objectStoreNames.contains('cache')) db.createObjectStore('cache');
+      };
       req.onsuccess = function () { self.db = req.result; resolve(self.db); };
       req.onerror = function () { reject(req.error); };
     });
   },
-  put: function (key, value) {
+  put: function (key, value, storeName) {
+    var name = storeName || 'files';
     return this.open().then(function (db) {
       return new Promise(function (resolve, reject) {
-        var tx = db.transaction('files', 'readwrite');
-        tx.objectStore('files').put(value, key);
+        var tx = db.transaction(name, 'readwrite');
+        tx.objectStore(name).put(value, key);
         tx.oncomplete = function () { resolve(true); };
         tx.onerror = function () { reject(tx.error); };
       });
     });
   },
-  get: function (key) {
+  get: function (key, storeName) {
+    var name = storeName || 'files';
     return this.open().then(function (db) {
       return new Promise(function (resolve, reject) {
-        var tx = db.transaction('files', 'readonly');
-        var req = tx.objectStore('files').get(key);
+        var tx = db.transaction(name, 'readonly');
+        var req = tx.objectStore(name).get(key);
         req.onsuccess = function () { resolve(req.result || null); };
         req.onerror = function () { reject(req.error); };
       });
     });
   },
-  del: function (key) {
+  del: function (key, storeName) {
+    var name = storeName || 'files';
     return this.open().then(function (db) {
       return new Promise(function (resolve) {
-        var tx = db.transaction('files', 'readwrite');
-        tx.objectStore('files').delete(key);
+        var tx = db.transaction(name, 'readwrite');
+        tx.objectStore(name).delete(key);
         tx.oncomplete = function () { resolve(true); };
         tx.onerror = function () { resolve(false); };
       });
     });
   },
-  keys: function () {
+  keys: function (storeName) {
+    var name = storeName || 'files';
     return this.open().then(function (db) {
       return new Promise(function (resolve) {
-        var tx = db.transaction('files', 'readonly');
-        var req = tx.objectStore('files').getAllKeys();
+        var tx = db.transaction(name, 'readonly');
+        var req = tx.objectStore(name).getAllKeys();
         req.onsuccess = function () { resolve(req.result || []); };
         req.onerror = function () { resolve([]); };
       });
     });
   }
 };
+
+/* ------------------- 2b. Resilience: diagnostics & guards ----------------- */
+/* Nothing in this block may throw. It is the layer the rest of the page leans
+   on when a renderer, an action or the network misbehaves. */
+
+var diagnostics = { list: [] };
+try {
+  var savedDiagnostics = store.get(KEYS.diagnostics, []);
+  if (Array.isArray(savedDiagnostics)) diagnostics.list = savedDiagnostics.slice(-DIAGNOSTICS_MAX);
+} catch (err) { diagnostics.list = []; }
+
+function diagnosticsSave() {
+  try { store.set(KEYS.diagnostics, diagnostics.list.slice(-DIAGNOSTICS_MAX)); } catch (err) {}
+}
+// Records a caught problem for the teacher instead of letting it break the page.
+function recordDiagnostic(kind, message, detail) {
+  try {
+    var text = String(message === null || message === undefined ? 'Unknown problem' : message).slice(0, 400);
+    var last = diagnostics.list[diagnostics.list.length - 1];
+    if (last && last.kind === kind && last.message === text) {
+      last.count = (last.count || 1) + 1;
+      last.at = new Date().toISOString();
+    } else {
+      diagnostics.list.push({
+        at: new Date().toISOString(), kind: kind || 'error', message: text, count: 1,
+        where: detail ? String(detail).slice(0, 200) : ''
+      });
+      if (diagnostics.list.length > DIAGNOSTICS_MAX) diagnostics.list = diagnostics.list.slice(-DIAGNOSTICS_MAX);
+    }
+    diagnosticsSave();
+    // Re-entrancy guard: a failing Diagnostics panel must not record itself.
+    if (!diagnostics.painting && typeof renderDiagnostics === 'function') {
+      diagnostics.painting = true;
+      try { renderDiagnostics(); } catch (e) {}
+      diagnostics.painting = false;
+    }
+  } catch (err) { diagnostics.painting = false; /* diagnostics must never cascade */ }
+}
+function clearDiagnostics() {
+  diagnostics.list = [];
+  diagnosticsSave();
+}
+function errorText(err) {
+  if (!err) return 'Unknown problem';
+  if (typeof err === 'string') return err;
+  return err.message || String(err);
+}
+// Runs fn so a failure is recorded and swallowed rather than blanking the page.
+function guarded(label, fn, fallback) {
+  return function () {
+    try { return fn.apply(this, arguments); }
+    catch (err) {
+      recordDiagnostic('script', errorText(err), label);
+      return fallback;
+    }
+  };
+}
+function installErrorShield() {
+  if (typeof window === 'undefined' || window.__madvShield) return;
+  window.__madvShield = true;
+  window.addEventListener('error', function (event) {
+    var where = event && event.filename ? (event.filename + ':' + (event.lineno || 0)) : 'window';
+    recordDiagnostic('script', (event && (event.message || errorText(event.error))) || 'Script error', where);
+  });
+  window.addEventListener('unhandledrejection', function (event) {
+    recordDiagnostic('promise', errorText(event && event.reason), 'unhandled rejection');
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  });
+}
+// Installed immediately, not at DOMContentLoaded: a failure while the page is
+// still starting up is exactly the one worth catching.
+installErrorShield();
+
+/* --- Timing helpers ------------------------------------------------------ */
+function wait(ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, Math.max(0, ms || 0)); });
+}
+// Spreads retries so thirty reconnecting devices do not land on the same second.
+function jittered(ms) {
+  return Math.round(ms * (0.5 + Math.random()));
+}
+// A refusal (wrong password, blocked account, bad request) is final. A timeout,
+// a rate limit or a dropped connection is worth exactly one more try.
+function isTransientError(err) {
+  if (!err) return false;
+  if (err.refused || err.fatal) return false;
+  return true;
+}
+function retryOnce(attempt, baseMs) {
+  return Promise.resolve().then(attempt).catch(function (err) {
+    if (!isTransientError(err)) throw err;
+    return wait(jittered(baseMs || LOGIN_RETRY_BASE_MS)).then(attempt);
+  });
+}
+
+/* --- Sign-in brute-force lockout (per device) ---------------------------- */
+function authLockRead() {
+  var saved = store.get(KEYS.authLock, null);
+  if (!saved || typeof saved !== 'object') return { fails: 0, level: 0, until: 0 };
+  return {
+    fails: Number(saved.fails) || 0,
+    level: Number(saved.level) || 0,
+    until: Number(saved.until) || 0
+  };
+}
+function authLockWrite(value) { store.set(KEYS.authLock, value); return value; }
+// Milliseconds still to wait, or 0 when sign-in is allowed.
+function authLockRemaining() {
+  var lock = authLockRead();
+  var left = lock.until - Date.now();
+  if (left <= 0) {
+    if (lock.until) authLockWrite({ fails: 0, level: lock.level, until: 0 });
+    return 0;
+  }
+  return left;
+}
+function describeWait(ms) {
+  var secs = Math.ceil(ms / 1000);
+  if (secs < 60) return secs + ' second' + (secs === 1 ? '' : 's');
+  var mins = Math.ceil(secs / 60);
+  return mins + ' minute' + (mins === 1 ? '' : 's');
+}
+function authLockError(ms) {
+  var err = new Error('Too many failed sign-in attempts on this device. Please wait ' +
+    describeWait(ms) + ' and try again.');
+  err.lockout = true;
+  err.fatal = true;
+  err.refused = true;
+  return err;
+}
+// Call before checking any credentials. Throws while the device is paused.
+function authLockGuard() {
+  var left = authLockRemaining();
+  if (left > 0) throw authLockError(left);
+}
+// A wrong password. Every AUTH_FAIL_THRESHOLD misses pause this device, and the
+// pause doubles each time (60s, 2m, 4m, 8m) up to a 15 minute ceiling.
+function authLockFailure() {
+  var lock = authLockRead();
+  lock.fails += 1;
+  if (lock.fails >= AUTH_FAIL_THRESHOLD) {
+    var span = Math.min(AUTH_LOCK_MAX_MS, AUTH_LOCK_BASE_MS * Math.pow(2, lock.level));
+    lock.level += 1;
+    lock.fails = 0;
+    lock.until = Date.now() + span;
+    authLockWrite(lock);
+    return span;
+  }
+  lock.until = 0;
+  authLockWrite(lock);
+  return 0;
+}
+// Any successful sign-in clears the whole history for this device.
+function authLockReset() { store.remove(KEYS.authLock); }
+// Wraps the thrown credential error with the lockout notice when one starts.
+function authLockNote(err) {
+  var span = authLockFailure();
+  if (!span) return err;
+  var locked = authLockError(span);
+  locked.message = errorText(err) + ' Sign-in on this device is paused for ' +
+    describeWait(span) + ' after ' + AUTH_FAIL_THRESHOLD + ' failed attempts.';
+  return locked;
+}
+
+/* --- Administrator inactivity sign-out ----------------------------------- */
+var adminIdle = { last: Date.now(), timer: null };
+function adminIdleMinutes() {
+  var raw = state && state.settings ? state.settings.adminIdleMinutes : ADMIN_IDLE_DEFAULT_MIN;
+  var mins = Number(raw);
+  if (!isFinite(mins) || mins < 0) return ADMIN_IDLE_DEFAULT_MIN;
+  if (mins === 0) return 0;
+  return Math.max(1, Math.min(ADMIN_IDLE_MAX_MIN, Math.round(mins)));
+}
+function adminIdleLimitMs() { return adminIdleMinutes() * 60 * 1000; }
+function noteAdminActivity() { adminIdle.last = Date.now(); }
+function checkAdminIdle() {
+  try {
+    if (typeof currentAdmin !== 'function' || !currentAdmin()) return;
+    var limit = adminIdleLimitMs();
+    if (!limit) return;                       // 0 = never sign out
+    if (Date.now() - adminIdle.last < limit) return;
+    logout();
+    showView('library');
+    toast('Signed out of the admin area after ' + adminIdleMinutes() + ' minutes of inactivity.', 'info');
+  } catch (err) {
+    recordDiagnostic('script', errorText(err), 'checkAdminIdle');
+  }
+}
+function startAdminIdleWatch() {
+  if (adminIdle.timer) return;
+  adminIdle.timer = setInterval(checkAdminIdle, ADMIN_IDLE_CHECK_MS);
+}
 
 /* ------------------------------- 3. Helpers ------------------------------- */
 function $(sel, root) { return (root || document).querySelector(sel); }
@@ -3075,13 +3375,26 @@ function loginStudentLocally(u, p, at) {
 }
 // Signs in against the shared register when it is reachable, so the same
 // account works on every device, and falls back to this device when offline.
+// Always returns a promise. A wrong password on a device-only account used to
+// throw synchronously out of this function, which left the caller's
+// "Signing in…" button spinning forever; every failure now rejects.
 function loginStudent(username, password) {
   var u = String(username || '').trim().toLowerCase();
   var p = String(password || '');
   var at = new Date().toISOString();
-  if (!syncActive()) return Promise.resolve(loginStudentLocally(u, p, at));
+  var deny = function (err) { return Promise.reject(authLockNote(err)); };
+  try { authLockGuard(); } catch (locked) { return Promise.reject(locked); }
+  var localOnly = function () {
+    var student;
+    try { student = loginStudentLocally(u, p, at); }
+    catch (err) { return deny(err); }
+    authLockReset();
+    return Promise.resolve(student);
+  };
+  if (!syncActive()) return localOnly();
   return syncLogin(u, p).then(function (student) {
-    if (!student) return loginStudentLocally(u, p, at);
+    if (!student) return localOnly();
+    authLockReset();
     logEvent('logins', { at: at, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Sign in' });
     state.session = { role: 'student', studentId: student.id, at: at };
     saveSession();
@@ -3095,22 +3408,26 @@ function loginStudent(username, password) {
     // that only exists on this device (registered while offline) and a backend
     // that cannot be reached both fall back to the local copy.
     var local = state.students.filter(function (s) { return s.username.toLowerCase() === u; })[0];
-    if (err && err.refused && local && local.syncedAt) throw err;
-    return loginStudentLocally(u, p, at);
+    if (err && err.refused && local && local.syncedAt) return deny(err);
+    return localOnly();
   });
 }
 function loginAdmin(username, password) {
   var u = String(username || '').trim().toLowerCase();
   var p = String(password || '');
   var at = new Date().toISOString();
+  authLockGuard();
   var okUser = u === String(state.settings.adminUser || '').toLowerCase();
   var okPass = p === String(state.settings.adminPass || '');
   if (!okUser || !okPass) {
     logEvent('logins', { at: at, studentId: null, name: u || '(blank)', year: '', ok: false, kind: 'Failed admin sign in' });
-    throw new Error('Incorrect administrator username or password.');
+    throw authLockNote(new Error('Incorrect administrator username or password.'));
   }
+  authLockReset();
+  noteAdminActivity();
   state.session = { role: 'admin', at: at };
   saveSession();
+  startAdminIdleWatch();
   logEvent('logins', { at: at, studentId: null, name: 'Administrator (' + state.settings.adminUser + ')', year: '', ok: true, kind: 'Admin sign in' });
   return true;
 }
@@ -3528,15 +3845,33 @@ function syncQueueAdd(entry) {
   renderSettings();
   return true;
 }
+/* Backend friendliness: when thirty devices reconnect at the same time, a
+   backend that is rate limiting or still waking up must not be hit with the
+   whole queue from every device. The first transient failure stops this drain
+   and starts a jittered cooldown that doubles from 30 seconds to 5 minutes.
+   Nothing is lost — the events stay durably queued for the next attempt. */
+function syncCooldownActive() {
+  return !!(state.sync.cooldownUntil && Date.now() < state.sync.cooldownUntil);
+}
+function syncCooldownStart() {
+  var base = Math.min(SYNC_COOLDOWN_MAX_MS, Math.max(SYNC_COOLDOWN_MIN_MS, (state.sync.cooldownMs || 0) * 2 || SYNC_COOLDOWN_MIN_MS));
+  state.sync.cooldownMs = base;
+  state.sync.cooldownUntil = Date.now() + jittered(base);
+  return base;
+}
+function syncCooldownClear() {
+  state.sync.cooldownMs = 0;
+  state.sync.cooldownUntil = 0;
+}
 function syncQueueFlush() {
-  if (!syncReady() || state.sync.flushing) return Promise.resolve(0);
+  if (!syncReady() || state.sync.flushing || syncCooldownActive()) return Promise.resolve(0);
   var snapshot = syncQueue();
   if (!snapshot.length) { state.sync.pending = 0; return Promise.resolve(0); }
   state.sync.flushing = true;
   var sent = 0;
   var index = 0;
   function next() {
-    if (index >= snapshot.length) return Promise.resolve(sent);
+    if (index >= snapshot.length) { syncCooldownClear(); return Promise.resolve(sent); }
     var entry = snapshot[index];
     index++;
     // A visit from hours ago is not worth replaying; registrations always are.
@@ -3546,22 +3881,28 @@ function syncQueueFlush() {
     }
     return syncRpc(entry.name, entry.payload).then(function (data) {
       sent++;
+      syncCooldownClear();
       syncApplyQueued(entry, data);
       syncQueueDrop(entry.id);
       return next();
     }, function (err) {
       entry.tries = (entry.tries || 0) + 1;
       if (err && err.fatal) {
+        // The backend answered and refused: drop it and carry on down the queue.
         syncQueueDrop(entry.id);
         state.sync.error = err.message;
-      } else if (entry.tries > 6) {
+        return next();
+      }
+      if (entry.tries > 6) {
         syncQueueDrop(entry.id);
       } else {
         var list = syncQueue();
         list.forEach(function (item) { if (item.id === entry.id) item.tries = entry.tries; });
         syncQueueSave(list);
       }
-      return next();
+      // Transient: stop draining and cool down rather than hammering the backend.
+      syncCooldownStart();
+      return sent;
     });
   }
   return next().then(function (count) {
@@ -3663,7 +4004,12 @@ function syncRegister(firstName, year, clientId) {
     });
 }
 function syncLogin(username, password) {
-  return syncRpc('madv_login', { p_username: username, p_password: password }).then(function (row) {
+  // 9:00 am is thirty sign-ins in one minute: a rate limit, a timeout or a
+  // network blip gets one jittered retry. A refusal from the backend (wrong
+  // password, blocked account) is final and is never replayed.
+  return retryOnce(function () {
+    return syncRpc('madv_login', { p_username: username, p_password: password });
+  }, LOGIN_RETRY_BASE_MS).then(function (row) {
     if (!row || row.ok !== true) {
       var refused = new Error((row && row.error) || 'Sign in was refused by the shared backend.');
       refused.fatal = true;
@@ -5313,6 +5659,9 @@ function renderSettings() {
   if (yearList && !yearList.value) yearList.value = (state.settings.years || []).join(', ');
   var adminUser = $('#admin-user-input');
   if (adminUser && !adminUser.value) adminUser.value = state.settings.adminUser || '';
+  var idleInput = $('#opt-admin-idle');
+  if (idleInput && !idleInput.dataset.touched) idleInput.value = adminIdleMinutes();
+  renderDiagnostics();
   $('#data-students').textContent = formatCount(state.students.length);
   $('#data-files').textContent = formatCount(state.resources.length);
   $('#data-downloads').textContent = formatCount(state.counters.downloads || 0);
@@ -5351,6 +5700,34 @@ function renderSettings() {
   if (syncHint) syncHint.innerHTML = syncHintHtml();
   setSwitch('#opt-sync-enabled', state.settings.syncEnabled !== false);
   setSwitch('#opt-sync-roster', state.settings.syncRosterInRepo !== false);
+}
+function diagnosticLabel(kind) {
+  if (kind === 'promise') return 'Background task';
+  if (kind === 'action') return 'Button action';
+  if (kind === 'render') return 'Page section';
+  if (kind === 'cache') return 'File cache';
+  return 'Script';
+}
+function renderDiagnostics() {
+  var list = $('#diagnostics-list');
+  var tag = $('#diagnostics-tag');
+  if (tag) {
+    tag.textContent = diagnostics.list.length ? diagnostics.list.length + ' recorded' : 'None';
+    tag.className = 'tag ' + (diagnostics.list.length ? 'tag--amber' : 'tag--emerald');
+  }
+  if (!list) return;
+  if (!diagnostics.list.length) {
+    list.innerHTML = '<p class="muted">Nothing recorded — the page has not had to recover from anything on this device.</p>';
+    return;
+  }
+  list.innerHTML = diagnostics.list.slice().reverse().map(function (entry) {
+    return '<div class="notice notice--warn"><div>' +
+      '<b>' + esc(diagnosticLabel(entry.kind)) + '</b> · ' + esc(relativeTime(entry.at)) +
+      (entry.count > 1 ? ' · ×' + entry.count : '') +
+      '<div class="text-sm mt-1">' + esc(entry.message) + '</div>' +
+      (entry.where ? '<div class="text-xs muted mt-1">' + esc(entry.where) + '</div>' : '') +
+    '</div></div>';
+  }).join('');
 }
 function syncHintHtml() {
   if (!syncReady()) {
@@ -5484,6 +5861,142 @@ function downloadableUrl(item) {
   var urls = resourceUrls(item);
   return urls.raw || '';
 }
+/* --- Download concurrency gate ------------------------------------------
+   A class clicking at once would otherwise open thirty sockets and have the
+   file host throttle every one of them. At most DOWNLOAD_MAX_PARALLEL fetches
+   run per device; the rest wait their turn in arrival order. */
+var downloadGate = { active: 0, waiting: [] };
+function gateRelease() {
+  downloadGate.active = Math.max(0, downloadGate.active - 1);
+  var next = downloadGate.waiting.shift();
+  if (next) { downloadGate.active += 1; next(); }
+}
+function gateRun(task) {
+  return new Promise(function (resolve, reject) {
+    var start = function () {
+      Promise.resolve().then(task).then(function (value) { gateRelease(); resolve(value); },
+        function (err) { gateRelease(); reject(err); });
+    };
+    if (downloadGate.active < DOWNLOAD_MAX_PARALLEL) { downloadGate.active += 1; start(); }
+    else downloadGate.waiting.push(start);
+  });
+}
+
+/* --- Durable download cache ---------------------------------------------
+   Memory first, then IndexedDB, so the second and thirtieth student to open
+   the same paper get it instantly and it keeps working if the host slows
+   down. The key carries the file's current revision, so a replaced file is
+   never served from an old copy. Oldest entries are dropped first once the
+   cache passes DOWNLOAD_CACHE_MAX_BYTES. */
+var downloadCache = { memory: {}, inflight: {} };
+function downloadCacheKey(item) {
+  var url = downloadableUrl(item);
+  if (!url) return '';
+  var revision = item.sha || item.updatedAt || item.uploadedAt || item.size || '';
+  return url + '|' + revision;
+}
+function downloadCacheIndex() {
+  var saved = store.get(KEYS.downloadCache, null);
+  return saved && typeof saved === 'object' ? saved : {};
+}
+function downloadCacheIndexSave(index) { store.set(KEYS.downloadCache, index); }
+function downloadCacheFresh(at) {
+  return !!at && (Date.now() - at) < DOWNLOAD_CACHE_TTL_MS;
+}
+function downloadCacheDrop(key) {
+  delete downloadCache.memory[key];
+  var index = downloadCacheIndex();
+  if (key in index) { delete index[key]; downloadCacheIndexSave(index); }
+  return fileStore.del(key, 'cache').catch(function () { return false; });
+}
+// Oldest-first eviction, plus a sweep of anything past its ten minutes.
+function downloadCachePrune() {
+  var index = downloadCacheIndex();
+  var keys = Object.keys(index);
+  var stale = keys.filter(function (k) { return !downloadCacheFresh(index[k] && index[k].at); });
+  var live = keys.filter(function (k) { return stale.indexOf(k) < 0; })
+    .sort(function (a, b) { return (index[a].at || 0) - (index[b].at || 0); });
+  var total = live.reduce(function (sum, k) { return sum + (Number(index[k].bytes) || 0); }, 0);
+  while (live.length && total > DOWNLOAD_CACHE_MAX_BYTES) {
+    var oldest = live.shift();
+    total -= Number(index[oldest].bytes) || 0;
+    stale.push(oldest);
+  }
+  if (!stale.length) return Promise.resolve(0);
+  stale.forEach(function (k) { delete downloadCache.memory[k]; delete index[k]; });
+  downloadCacheIndexSave(index);
+  return Promise.all(stale.map(function (k) {
+    return fileStore.del(k, 'cache').catch(function () { return false; });
+  })).then(function () { return stale.length; });
+}
+function downloadCacheRead(key) {
+  if (!key) return Promise.resolve(null);
+  var hit = downloadCache.memory[key];
+  if (hit && downloadCacheFresh(hit.at)) return Promise.resolve(hit.blob);
+  if (hit) delete downloadCache.memory[key];
+  var index = downloadCacheIndex();
+  var meta = index[key];
+  if (!meta) return Promise.resolve(null);
+  if (!downloadCacheFresh(meta.at)) return downloadCacheDrop(key).then(function () { return null; });
+  return fileStore.get(key, 'cache').then(function (entry) {
+    if (!entry || !entry.blob || !downloadCacheFresh(entry.at)) return null;
+    downloadCache.memory[key] = { blob: entry.blob, at: entry.at };
+    return entry.blob;
+  }).catch(function () { return null; });
+}
+function downloadCacheWrite(key, blob) {
+  if (!key || !blob) return Promise.resolve(false);
+  var at = Date.now();
+  var bytes = Number(blob.size) || 0;
+  downloadCache.memory[key] = { blob: blob, at: at };
+  if (bytes > DOWNLOAD_CACHE_MAX_BYTES) return Promise.resolve(false);  // never evict everything for one file
+  var index = downloadCacheIndex();
+  index[key] = { at: at, bytes: bytes };
+  downloadCacheIndexSave(index);
+  return fileStore.put(key, { blob: blob, at: at, bytes: bytes }, 'cache')
+    .then(function () { return downloadCachePrune(); })
+    .then(function () { return true; })
+    .catch(function (err) {
+      // Private mode or a full disk: the memory copy still serves this lesson.
+      recordDiagnostic('cache', errorText(err), 'download cache write');
+      var current = downloadCacheIndex();
+      delete current[key];
+      downloadCacheIndexSave(current);
+      return false;
+    });
+}
+
+// One fetch with a 30 second ceiling, retried once for a transient failure.
+function fetchBlobWithTimeout(url) {
+  var attempt = function () {
+    var controller = typeof AbortController === 'function' ? new AbortController() : null;
+    var timedOut = false;
+    var timer = controller ? setTimeout(function () { timedOut = true; controller.abort(); }, DOWNLOAD_TIMEOUT_MS) : null;
+    return fetch(url, {
+      cache: 'no-store',
+      signal: controller ? controller.signal : undefined
+    }).then(function (res) {
+      if (!res.ok) {
+        var httpErr = new Error('Download failed (HTTP ' + res.status + ')');
+        // 404/403 mean the file is simply not there: retrying cannot help.
+        if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) httpErr.fatal = true;
+        throw httpErr;
+      }
+      return res.blob();
+    }).then(function (blob) {
+      if (timer) clearTimeout(timer);
+      return blob;
+    }, function (err) {
+      if (timer) clearTimeout(timer);
+      if (timedOut || (err && err.name === 'AbortError')) {
+        throw new Error('The file did not arrive within ' + Math.round(DOWNLOAD_TIMEOUT_MS / 1000) + ' seconds.');
+      }
+      throw err;
+    });
+  };
+  return retryOnce(attempt, LOGIN_RETRY_BASE_MS);
+}
+
 function fetchFileBlob(item) {
   if (item.source === 'device') {
     return fileStore.get(item.id).then(function (blob) {
@@ -5493,10 +6006,26 @@ function fetchFileBlob(item) {
   }
   var url = downloadableUrl(item);
   if (!url) return Promise.reject(new Error('No download link is available for this file yet.'));
-  return fetch(url, { cache: 'no-store' }).then(function (res) {
-    if (!res.ok) throw new Error('Download failed (HTTP ' + res.status + ')');
-    return res.blob();
+  var key = downloadCacheKey(item);
+  if (!key) return fetchBlobWithTimeout(url);
+  // Concurrent clicks on the same file share a single fetch.
+  if (downloadCache.inflight[key]) return downloadCache.inflight[key];
+  var request = downloadCacheRead(key).then(function (cached) {
+    if (cached) return cached;
+    return gateRun(function () {
+      // Another click may have filled the cache while this one queued.
+      return downloadCacheRead(key).then(function (late) {
+        if (late) return late;
+        return fetchBlobWithTimeout(url).then(function (blob) {
+          return downloadCacheWrite(key, blob).then(function () { return blob; });
+        });
+      });
+    });
   });
+  downloadCache.inflight[key] = request;
+  var forget = function () { delete downloadCache.inflight[key]; };
+  request.then(forget, forget);
+  return request;
 }
 function downloadResource(id) {
   var item = findResource(id);
@@ -5974,6 +6503,15 @@ function saveOptions() {
   state.settings.school = $('#opt-school').value.trim();
   var years = $('#opt-year-list').value.split(',').map(function (y) { return y.trim(); }).filter(Boolean);
   state.settings.years = years.length ? years : DEFAULT_YEARS.slice();
+  var idleInput = $('#opt-admin-idle');
+  if (idleInput) {
+    var raw = String(idleInput.value).trim();
+    var mins = Number(raw);
+    if (raw === '' || !isFinite(mins) || mins < 0) mins = ADMIN_IDLE_DEFAULT_MIN;
+    state.settings.adminIdleMinutes = mins === 0 ? 0 : Math.max(1, Math.min(ADMIN_IDLE_MAX_MIN, Math.round(mins)));
+    idleInput.dataset.touched = '';
+    noteAdminActivity();        // saving is activity; do not sign out on the new limit
+  }
   saveSettings();
   renderAll();
   updateUploadMode();
@@ -6044,18 +6582,54 @@ function cloudSyncNow(silent) {
   });
 }
 /* ------------------- 10. Toasts, modals, actions & start-up ---------------- */
+/* Toasts are flood controlled: a repeated message collapses into a counter on
+   the existing toast, and the stack never grows past TOAST_MAX, so thirty
+   failures in a row cannot bury the page under notifications. */
+var toastLive = [];
+function toastDismiss(entry) {
+  if (!entry) return;
+  if (entry.timer) clearTimeout(entry.timer);
+  if (entry.el && entry.el.parentNode) entry.el.remove();
+  var at = toastLive.indexOf(entry);
+  if (at >= 0) toastLive.splice(at, 1);
+}
+function toastArm(entry) {
+  if (entry.timer) clearTimeout(entry.timer);
+  entry.timer = setTimeout(function () { toastDismiss(entry); }, TOAST_LIFE_MS);
+}
 function toast(message, type) {
-  var stack = $('#toast-stack');
-  if (!stack) return;
-  var el = document.createElement('div');
-  var icon = type === 'success' ? 'check-circle' : type === 'error' ? 'alert-circle' : type === 'warn' ? 'alert-triangle' : 'info';
-  el.className = 'toast toast--' + (type || 'info');
-  el.setAttribute('role', type === 'error' ? 'alert' : 'status');
-  el.innerHTML = svgIcon(icon, 'ico--sm') + '<div class="grow">' + esc(message) + '</div>' +
-    '<button type="button" class="toast__close" aria-label="Dismiss">' + svgIcon('x', 'ico--sm') + '</button>';
-  el.querySelector('.toast__close').addEventListener('click', function () { el.remove(); });
-  stack.appendChild(el);
-  setTimeout(function () { el.remove(); }, 6000);
+  try {
+    var stack = $('#toast-stack');
+    if (!stack) return;
+    var text = String(message === null || message === undefined ? '' : message);
+    var kind = type || 'info';
+    // Collapse a repeat of the same message rather than stacking another copy.
+    for (var i = 0; i < toastLive.length; i++) {
+      var live = toastLive[i];
+      if (live.text === text && live.kind === kind && live.el.parentNode) {
+        live.count += 1;
+        var badge = live.el.querySelector('.toast__count');
+        if (badge) { badge.textContent = '×' + live.count; badge.hidden = false; }
+        toastArm(live);
+        return;
+      }
+    }
+    while (toastLive.length >= TOAST_MAX) toastDismiss(toastLive[0]);
+    var el = document.createElement('div');
+    var icon = kind === 'success' ? 'check-circle' : kind === 'error' ? 'alert-circle' : kind === 'warn' ? 'alert-triangle' : 'info';
+    el.className = 'toast toast--' + kind;
+    el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    el.innerHTML = svgIcon(icon, 'ico--sm') + '<div class="grow">' + esc(text) + '</div>' +
+      '<span class="toast__count" hidden></span>' +
+      '<button type="button" class="toast__close" aria-label="Dismiss">' + svgIcon('x', 'ico--sm') + '</button>';
+    var entry = { el: el, text: text, kind: kind, count: 1, timer: null };
+    el.querySelector('.toast__close').addEventListener('click', function () { toastDismiss(entry); });
+    stack.appendChild(el);
+    toastLive.push(entry);
+    toastArm(entry);
+  } catch (err) {
+    recordDiagnostic('script', errorText(err), 'toast');
+  }
 }
 var modalStack = [];
 function openModal(opts) {
@@ -6230,15 +6804,21 @@ function authBusy(form, busy, label) {
 }
 function submitStudentLogin(event) {
   event.preventDefault();
-  authBusy(event.target, true, 'Signing in…');
-  loginStudent($('#sa-user').value, $('#sa-pass').value).then(function (student) {
+  var form = event.target;
+  authBusy(form, true, 'Signing in…');
+  // Promise.resolve() guarantees the button is released even if the sign-in
+  // path ever fails synchronously again.
+  Promise.resolve().then(function () {
+    return loginStudent($('#sa-user').value, $('#sa-pass').value);
+  }).then(function (student) {
     state.authModal.error = '';
     closeModal();
     renderAll();
     toast('Welcome back, ' + student.firstName + ' (' + student.year + ').', 'success');
     showView('my-learning');
   }, function (err) {
-    state.authModal.error = err.message;
+    authBusy(form, false, 'Log in');
+    state.authModal.error = errorText(err);
     renderStudentAuth();
   });
 }
@@ -6813,8 +7393,48 @@ var ACTIONS = {
     closeModal();
   },
   'confirm-accept': function () { resolveConfirm(true); },
-  'confirm-cancel': function () { resolveConfirm(false); }
+  'confirm-cancel': function () { resolveConfirm(false); },
+  'clear-diagnostics': function () {
+    clearDiagnostics();
+    renderDiagnostics();
+    toast('Diagnostics cleared.', 'success');
+  }
 };
+
+/* Every button action runs in isolation: one broken handler reports itself in
+   Diagnostics instead of taking the page down with it. Applied at dispatch so
+   it covers handlers added after start-up too. */
+function runAction(name, handler, el, event) {
+  try { return handler(el, event); }
+  catch (err) {
+    recordDiagnostic('action', errorText(err), 'data-action="' + name + '"');
+    toast('That action could not be completed. The details are in Cloud settings → Diagnostics.', 'error');
+    return undefined;
+  }
+}
+
+/* The same isolation for renderers: a single bad record in one panel can never
+   leave the student looking at a blank page. */
+(function isolateRenderers() {
+  [
+    'applyVisibility', 'renderAll', 'renderCounters', 'renderCounterViews', 'renderLibrary',
+    'renderStudentStrip', 'renderMyLearning', 'renderDashboard', 'renderSettings',
+    'renderStudentTable', 'renderFeeds', 'renderAnalytics', 'renderFilesTable',
+    'renderDownloadPolicy', 'renderDiagnostics'
+  ].forEach(function (name) {
+    var fn = typeof window !== 'undefined' ? window[name] : null;
+    if (typeof fn !== 'function' || fn.__guarded) return;
+    var wrapped = function () {
+      try { return fn.apply(this, arguments); }
+      catch (err) {
+        recordDiagnostic('render', errorText(err), name + '()');
+        return undefined;
+      }
+    };
+    wrapped.__guarded = true;
+    window[name] = wrapped;
+  });
+})();
 
 /* --------------------------------- Wiring -------------------------------- */
 function wireEvents() {
@@ -6827,9 +7447,9 @@ function wireEvents() {
     }
     var action = el.dataset.action;
     var handler = ACTIONS[action];
-    if (!handler) return;
+    if (typeof handler !== 'function') return;
     event.preventDefault();
-    handler(el, event);
+    runAction(action, handler, el, event);
   });
 
   document.addEventListener('keydown', function (event) {
@@ -6959,9 +7579,18 @@ function wireEvents() {
     if (state.view === 'dashboard' && currentAdmin()) refreshAdminRosterIfStale(false);
   });
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && state.view === 'dashboard' && currentAdmin()) refreshAdminRosterIfStale(false);
+    if (document.hidden) return;
+    // Catch up on everything the tab skipped drawing while it was in the background.
+    if (state.renderPending) { state.renderPending = false; renderAll(); }
+    checkAdminIdle();
+    if (state.view === 'dashboard' && currentAdmin()) refreshAdminRosterIfStale(false);
   });
   window.addEventListener('beforeunload', function () { saveSession(); });
+
+  // Any sign of a person at the keyboard keeps the admin session alive.
+  ['pointerdown', 'keydown', 'wheel', 'touchstart', 'focus'].forEach(function (type) {
+    document.addEventListener(type, noteAdminActivity, { capture: true, passive: true });
+  });
 }
 function updateConnectionState() {
   var banner = $('#offline-banner');
@@ -6987,11 +7616,17 @@ function refreshAdminRosterIfStale(force) {
   return loadSyncConfig().then(function () { return syncPullRoster(); });
 }
 function refreshRelativeTimes() {
-  if (state.view === 'dashboard') {
+  checkAdminIdle();
+  // A hidden tab keeps its data fresh but does no drawing: thirty backgrounded
+  // classroom tabs should not each be re-rendering a dashboard every minute.
+  var hidden = typeof document !== 'undefined' && document.hidden === true;
+  if (hidden) {
+    state.renderPending = true;
+  } else if (state.view === 'dashboard') {
     renderStudentTable(); renderFeeds(); renderAnalytics(); renderFilesTable();
-    refreshAdminRosterIfStale(false);
   } else if (state.view === 'my-learning') renderMyLearning();
-  renderCounters();
+  if (state.view === 'dashboard') refreshAdminRosterIfStale(false);
+  if (!hidden) renderCounters();
   if (navigator.onLine !== false) {
     loadAbacusTotals(false);
     syncAbacusFileTotals(false);
@@ -7009,6 +7644,18 @@ function init() {
     state.settings.version = APP_VERSION;
     saveSettings();
   }
+
+  // Catch script errors and unhandled rejections before anything else runs, so
+  // a failure during start-up still leaves a working page and a diagnostic.
+  installErrorShield();
+  if (state.settings.adminIdleMinutes === undefined || state.settings.adminIdleMinutes === null) {
+    state.settings.adminIdleMinutes = ADMIN_IDLE_DEFAULT_MIN;
+    saveSettings();
+  }
+  noteAdminActivity();
+  startAdminIdleWatch();
+  // Drop anything the download cache has held past its ten minutes.
+  downloadCachePrune().catch(function () { return 0; });
 
   var vers = $('#app-version');
   if (vers) vers.textContent = APP_VERSION;
