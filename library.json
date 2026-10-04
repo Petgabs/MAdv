@@ -1,7 +1,7 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T17:36:13.765Z",
+  "updatedAt": "2026-10-04T17:36:20.219Z",
   "resources": [
     {
       "id": "res_mutw4iuyw6ig74",
@@ -46,29 +46,6 @@
       "visible": true,
       "visibility": "all",
       "path": "resources/Year 11/Gosford 2026 w. sol.pdf",
-      "source": "cloud",
-      "published": true
-    },
-    {
-      "id": "res_muu3dlcztxj2u3",
-      "title": "Knox 2025 W. Sol",
-      "fileName": "Knox 2025 w. sol.pdf",
-      "ext": "pdf",
-      "kind": "document",
-      "year": "Year 11",
-      "topic": "Mixed revision — all topics",
-      "category": "Practice questions",
-      "description": "",
-      "owner": "",
-      "department": "Mathematics",
-      "keywords": [],
-      "addedAt": "2026-10-04T17:25:38.531Z",
-      "bytes": 1225287,
-      "downloads": 5,
-      "lastDownloadAt": "2026-10-04T16:44:43Z",
-      "visible": true,
-      "visibility": "all",
-      "path": "resources/Year 11/Knox 2025 w. sol.pdf",
       "source": "cloud",
       "published": true
     }
