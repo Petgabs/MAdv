@@ -229,12 +229,13 @@ add an option everywhere.
   (or a stable resource id when there is no path). It is hashed into a short,
   URL-safe key; display titles and student details are not sent. Moving a file
   to a new path starts a new per-file counter.
-* **Offline** — a visit/download made while the browser already knows it is
-  offline is queued locally and sent once when the connection returns. Abacus
-  does not support idempotency tokens, so a request with an uncertain network
-  result is not retried automatically; this avoids accidentally incrementing
-  the total twice. The admin dashboard shows queued changes and connection
-  status.
+* **Offline and rate limits** — a visit/download made while the browser already
+  knows it is offline is queued locally and sent once when the connection
+  returns. Hits in one tab are spaced out to avoid bursts. Abacus HTTP 429
+  rate-limit rejections are retried using `Retry-After` (and safely re-queued if
+  the limit persists); a timeout or dropped connection is not retried because
+  Abacus may already have counted it. The admin dashboard shows queued changes
+  and connection status.
 * **Detailed and daily analytics** — Abacus stores only integer totals; it has
   no timestamps, device identities or event log. Supabase, when configured,
   separately keeps student activity and daily analytics. Without Supabase,
@@ -352,7 +353,7 @@ sync** to publish counters only.
 | Student cannot log in from a second device | Check **Cloud settings → Shared student register → Test connection**. Online registration is only confirmed after the shared backend accepts it; the admin dashboard refreshes the live roster when opened and on return to focus. |
 | Online registration is not ready | Configure the Supabase URL and publishable key in **Cloud settings → Shared student register**, then run `backends/supabase/schema.sql`. Registration is intentionally not completed on a single browser when this backend is unavailable. |
 | "Please use letters only for the first name" for an ordinary name | Fixed in this version: the name check used to reject almost every real name. Reload the page to pick up the new `index.html`. |
-| Abacus counters do not move | Check the Abacus status in the admin dashboard and make sure the browser can reach `https://abacus.jasoncameron.dev`. The API may be rate-limited or temporarily unavailable; cached/local counts remain visible. Supabase **Sync now** refreshes student activity, not the Abacus totals. |
+| Abacus counters do not move | Check the Abacus status in the admin dashboard and make sure the browser can reach the Abacus API at `https://abacus.jasoncameron.dev` (the linked v2 page is documentation). HTTP 429 rate-limit responses are retried and queued; cached/local counts remain visible while Abacus recovers. Supabase **Sync now** refreshes student activity, not the Abacus totals. |
 | The repository mirror is empty or stale | Run the **Mirror the shared register** workflow manually (Actions → Run workflow) and check that `ADMIN_USER` / `ADMIN_PASS` match the site's administrator sign-in. |
 | Token rejected (HTTP 401/403) | Create a new fine-grained token with **Contents: Read and write**, save it again. |
 | File too large | The maximum upload is **50 MB per file** (adjustable down to 1 MB in *Cloud settings → Maximum upload size*). Compress the file, split it, or bundle several files into a ZIP. |

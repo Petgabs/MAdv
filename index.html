@@ -2998,12 +2998,18 @@ var ABACUS_BASE_URL = 'https://abacus.jasoncameron.dev';
 var ABACUS_NAMESPACE = 'petgabs-github-io-madv';
 var ABACUS_TIMEOUT_MS = 8000;
 var ABACUS_HIT_GAP_MS = 450;
+var ABACUS_RATE_LIMIT_RETRIES = 3;
 var ABACUS_REFRESH_MS = 60 * 1000;
 var ABACUS_FILE_REFRESH_MS = 5 * 60 * 1000;
 var ABACUS_FILE_LOOKUP_GAP_MS = 450;
 var ABACUS_QUEUE_MAX = 200;
 // How many per-student counters one "refresh counters" press may read.
 var ABACUS_STUDENT_SCAN_MAX = 60;
+// Abacus limits requests by IP, so downloads from the same browser are sent
+// in a small FIFO rather than bursting four /hit calls at once. A 429 is a
+// definite rejection (unlike a timeout) and is therefore safe to retry.
+var abacusHitQueue = Promise.resolve();
+var abacusLastHitAt = 0;
 
 function abacusHashKey(seed) {
   var text = String(seed || '');
@@ -3045,6 +3051,33 @@ function abacusStudentFileCounterKeyForResourceKey(student, resourceKey) {
 function abacusStudentFileCounterKey(student, item) {
   return abacusStudentFileCounterKeyForResourceKey(student, counterResourceKey(item));
 }
+function abacusRetryDelayMs(err, attempt) {
+  var retryAfter = '';
+  try { retryAfter = err && err.retryAfter ? err.retryAfter : ''; } catch (e) {}
+  if (retryAfter) {
+    var seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      // Abacus documents this header in milliseconds; tolerate the usual
+      // HTTP seconds form too, which is what older proxies may emit.
+      var delay = seconds <= 10 ? seconds * 1000 : seconds;
+      return Math.min(30000, Math.max(ABACUS_HIT_GAP_MS, delay));
+    }
+    var date = Date.parse(retryAfter);
+    if (Number.isFinite(date)) return Math.min(30000, Math.max(ABACUS_HIT_GAP_MS, date - Date.now()));
+  }
+  var message = err && err.message ? String(err.message) : '';
+  var match = message.match(/try again in\s*(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|seconds?)?/i);
+  if (match) {
+    var amount = Number(match[1]);
+    var unit = (match[2] || 's').toLowerCase();
+    var parsed = unit === 'ms' || unit.indexOf('millisecond') === 0 ? amount : amount * 1000;
+    return Math.min(30000, Math.max(ABACUS_HIT_GAP_MS, parsed));
+  }
+  return Math.min(30000, Math.max(ABACUS_HIT_GAP_MS, 1000 * Math.pow(2, attempt || 0)));
+}
+function abacusWait(ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, Math.max(0, ms || 0)); });
+}
 function abacusRequest(action, key) {
   key = String(key || '');
   if ((action !== 'get' && action !== 'hit') || !/^[A-Za-z0-9_.-]{3,64}$/.test(key)) {
@@ -3065,6 +3098,9 @@ function abacusRequest(action, key) {
       if (!res.ok) {
         var failed = new Error('Abacus returned HTTP ' + res.status + (data && data.error ? ': ' + data.error : '.'));
         failed.status = res.status;
+        if (res.status === 429) {
+          try { failed.retryAfter = res.headers && res.headers.get ? res.headers.get('Retry-After') : ''; } catch (e) {}
+        }
         throw failed;
       }
       var value = data && Number(data.value);
@@ -3076,6 +3112,35 @@ function abacusRequest(action, key) {
     if (err && err.name === 'AbortError') throw new Error('Abacus did not answer in time.');
     throw new Error(err && err.message ? err.message : 'Abacus could not be reached.');
   }).then(clearTimer, function (err) { clearTimer(); throw err; });
+}
+function abacusReadRequest(key, attempt) {
+  attempt = attempt || 0;
+  return abacusRequest('get', key).catch(function (err) {
+    if (!err || err.status !== 429 || attempt >= ABACUS_RATE_LIMIT_RETRIES) throw err;
+    var jitter = Math.floor(Math.random() * 500);
+    return abacusWait(abacusRetryDelayMs(err, attempt) + jitter)
+      .then(function () { return abacusReadRequest(key, attempt + 1); });
+  });
+}
+function abacusHitRequest(key) {
+  var task = abacusHitQueue.then(function () {
+    var wait = ABACUS_HIT_GAP_MS - (Date.now() - abacusLastHitAt);
+    return wait > 0 ? abacusWait(wait) : null;
+  }).then(function () {
+    function send(attempt) {
+      abacusLastHitAt = Date.now();
+      return abacusRequest('hit', key).catch(function (err) {
+        if (!err || err.status !== 429 || attempt >= ABACUS_RATE_LIMIT_RETRIES) throw err;
+        var jitter = Math.floor(Math.random() * 1000);
+        return abacusWait(abacusRetryDelayMs(err, attempt) + jitter)
+          .then(function () { return send(attempt + 1); });
+      });
+    }
+    return send(0);
+  });
+  // A failed hit must not poison the queue, or subsequent counters would stall.
+  abacusHitQueue = task.then(function () { return null; }, function () { return null; });
+  return task;
 }
 function abacusQueue() {
   var queue = store.get(KEYS.pendingAbacus, []);
@@ -3107,6 +3172,12 @@ function queueOfflineAbacusHit(key, kind) {
   state.abacus.status = 'offline';
   state.abacus.error = '';
   state.abacus.pending = abacusQueue().length;
+  renderCounterViews();
+  return null;
+}
+function queueRateLimitedAbacusHit(key, kind, err) {
+  if (!abacusQueueHit(key, kind)) err = new Error('The Abacus counter is rate-limited and the retry queue is full.');
+  abacusSetError(err, true);
   renderCounterViews();
   return null;
 }
@@ -3182,7 +3253,7 @@ function loadAbacusStudentTotalByKey(key, force) {
   }
   if (state.abacus.studentLoading[key]) return state.abacus.studentLoading[key];
   if (navigator.onLine === false) return Promise.resolve(null);
-  var request = abacusRequest('get', key).then(function (value) {
+  var request = abacusReadRequest(key).then(function (value) {
     applyAbacusStudentTotal(key, value, true);
     abacusMarkConnected();
     return state.abacus.studentTotals[key];
@@ -3204,7 +3275,7 @@ function loadAbacusStudentFileTotalByKey(key, force) {
   if (!force && typeof state.abacus.studentFiles[key] === 'number') return Promise.resolve(state.abacus.studentFiles[key]);
   if (state.abacus.studentFileLoading[key]) return state.abacus.studentFileLoading[key];
   if (navigator.onLine === false) return Promise.resolve(null);
-  var request = abacusRequest('get', key).then(function (value) {
+  var request = abacusReadRequest(key).then(function (value) {
     applyAbacusStudentFileTotal(key, value, true);
     abacusMarkConnected();
     return state.abacus.studentFiles[key];
@@ -3296,8 +3367,8 @@ function loadAbacusTotals(force) {
       Date.now() - new Date(state.abacus.lastSync).getTime() < ABACUS_REFRESH_MS) return Promise.resolve(true);
   state.abacus.status = 'checking';
   var request = Promise.all([
-    abacusRequest('get', 'visits'),
-    abacusRequest('get', 'downloads')
+    abacusReadRequest('visits'),
+    abacusReadRequest('downloads')
   ]).then(function (values) {
     applyAbacusTotal('visits', values[0], true);
     applyAbacusTotal('downloads', values[1], true);
@@ -3342,12 +3413,13 @@ function abacusIncrementCounter(key, kind) {
   return loadAbacusTotals().then(function () {
     if (navigator.onLine === false) return queueOfflineAbacusHit(key, kind);
     changeAbacusInFlight(key, kind, 1);
-    return abacusRequest('hit', key).then(function (value) {
+    return abacusHitRequest(key).then(function (value) {
       applyAbacusHit(key, kind, value);
       return value;
     }).catch(function (err) {
-      // Abacus /hit is not idempotent. Do not retry an ambiguous network error:
-      // it may have counted successfully even if the response was lost.
+      // A 429 is an explicit rejection and is safe to retry/queue. Never retry
+      // a timeout or dropped connection: Abacus may already have counted it.
+      if (err && err.status === 429) return queueRateLimitedAbacusHit(key, kind, err);
       abacusSetError(err);
       renderCounterViews();
       return null;
@@ -3377,12 +3449,11 @@ function countAbacusDownload(item, student) {
 }
 function abacusFlushQueue() {
   if (state.abacus.flushing || navigator.onLine === false) return Promise.resolve(0);
-  var sent = 0, attempted = 0;
+  var sent = 0;
   state.abacus.flushing = true;
   function next() {
     if (!abacusQueue().length || navigator.onLine === false) return Promise.resolve(sent);
-    var wait = attempted ? new Promise(function (resolve) { setTimeout(resolve, ABACUS_HIT_GAP_MS); }) : Promise.resolve();
-    return wait.then(function () {
+    return Promise.resolve().then(function () {
       if (navigator.onLine === false) return sent;
       var queue = abacusQueue();
       if (!queue.length) return sent;
@@ -3390,18 +3461,22 @@ function abacusFlushQueue() {
       // Remove before sending. A lost response must not make a non-idempotent hit repeat.
       abacusQueueSave(queue.slice(1));
       changeAbacusInFlight(entry.key, entry.kind, 1);
-      attempted++;
       var failed = false;
-      return abacusRequest('hit', entry.key).then(function (value) {
+      return abacusHitRequest(entry.key).then(function (value) {
         applyAbacusHit(entry.key, entry.kind, value);
         sent++;
       }).catch(function (err) {
         failed = true;
+        if (err && err.status === 429) {
+          // Abacus confirms a rate-limited hit was not applied. Keep it at the
+          // front of the queue for the next drain instead of losing the event.
+          abacusQueueSave([entry].concat(abacusQueue()));
+        }
         abacusSetError(err, true);
       }).then(function () {
         changeAbacusInFlight(entry.key, entry.kind, -1);
-        // A failed hit has an uncertain result. Drop only that entry and leave
-        // the remaining queue for a later connection attempt.
+        // A non-429 failure has an uncertain result, so drop only that entry
+        // and leave the rest for a later connection attempt.
         return failed ? sent : next();
       });
     });
@@ -3432,7 +3507,7 @@ function syncAbacusFileTotals(force) {
       var task = chain.then(function () {
         return new Promise(function (resolve) { setTimeout(resolve, ABACUS_FILE_LOOKUP_GAP_MS); });
       }).then(function () {
-        return abacusRequest('get', key);
+        return abacusReadRequest(key);
       }).then(function (value) {
         applyAbacusFileTotal(item, key, value, true);
         state.abacus.fileFetchedAt[key] = Date.now();

@@ -21,21 +21,36 @@ const check = (label, cond, extra) => {
   if (cond) { pass++; console.log('  ok   ' + label); }
   else { fail++; console.log('  FAIL ' + label + (extra !== undefined ? '  → ' + JSON.stringify(extra) : '')); }
 };
+const eventually = async (predicate, timeoutMs = 6000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return !!predicate();
+};
 
 const syncConfig = JSON.stringify({ provider: 'supabase', url: backend.url, publishableKey: 'sb_publishable_test' });
 const githubState = { cloudData: null, syncConfig: null, library: { resources: [] } };
 const abacusState = new Map();
 const abacusFailOnce = new Set();
+const abacusRateLimitOnce = new Set();
+const abacusRequests = [];
 function fakeAbacusFetch(url, json) {
   if (!String(url).startsWith('https://abacus.jasoncameron.dev/')) return null;
   const parts = new URL(url).pathname.split('/').filter(Boolean).map(decodeURIComponent);
   const [operation, namespace, key] = parts;
   const id = namespace + '/' + key;
+  abacusRequests.push({ operation, namespace, key, at: Date.now() });
   if (operation === 'get') {
     return json(abacusState.has(id) ? 200 : 404,
       abacusState.has(id) ? { value: abacusState.get(id) } : { error: 'Key not found' });
   }
   if (operation === 'hit') {
+    if (abacusRateLimitOnce.has(id)) {
+      abacusRateLimitOnce.delete(id);
+      return json(429, { error: 'Too many requests. Try again in 1s' }, { 'Retry-After': '450' });
+    }
     if (abacusFailOnce.has(id)) {
       abacusFailOnce.delete(id);
       return json(503, { error: 'temporarily unavailable' });
@@ -60,8 +75,9 @@ const dom = new JSDOM(html, {
     window.fetch = (input, init) => {
       const url = typeof input === 'string' ? input : input.url;
       const opts = init || {};
-      const json = (status, body) => Promise.resolve({
+      const json = (status, body, headers = {}) => Promise.resolve({
         status, ok: status >= 200 && status < 300,
+        headers: { get: (name) => headers[name] || headers[String(name).toLowerCase()] || null },
         json: () => Promise.resolve(body), text: () => Promise.resolve(JSON.stringify(body))
       });
       const abacusResponse = fakeAbacusFetch(url, json);
@@ -162,6 +178,20 @@ check('Abacus stores the shared visit total', abacusState.get('petgabs-github-io
 check('Abacus connection is visible to the app', app.state.abacus.status === 'ok', app.state.abacus.status);
 await other.window.loadAbacusTotals(true);
 check('a second browser reads the same Abacus total', other.window.state.counters.visits === abacusState.get('petgabs-github-io-madv/visits'), other.window.state.counters.visits);
+check('visitor totals use the documented Abacus API host and namespace',
+  app.ABACUS_BASE_URL === 'https://abacus.jasoncameron.dev' && app.ABACUS_NAMESPACE === 'petgabs-github-io-madv');
+check('visitor increments are sent to Abacus /hit/namespace/visits',
+  abacusRequests.some((request) => request.operation === 'hit' && request.namespace === app.ABACUS_NAMESPACE && request.key === 'visits'));
+
+console.log('\n4b. Abacus rate-limit responses do not lose counter hits');
+const rateLimitProbe = 'file-rate-limit-probe';
+const rateLimitProbeId = app.ABACUS_NAMESPACE + '/' + rateLimitProbe;
+abacusRateLimitOnce.add(rateLimitProbeId);
+await app.abacusIncrementCounter(rateLimitProbe, 'file');
+const rateLimitProbeHits = abacusRequests.filter((request) => request.operation === 'hit' && request.key === rateLimitProbe);
+check('a 429 is retried safely and the Abacus counter increments once',
+  abacusState.get(rateLimitProbeId) === 1 && rateLimitProbeHits.length === 2,
+  { total: abacusState.get(rateLimitProbeId), attempts: rateLimitProbeHits.length });
 
 console.log('\n5. Abacus total + per-file downloads and Supabase activity log');
 const item = { id: 'res1', title: 'Practice', fileName: 'a.pdf', source: 'cloud', path: 'Year 12/a.pdf', category: 'Homework', topic: 'Functions', year: 'Year 12', downloads: 0 };
@@ -173,6 +203,8 @@ check('Supabase records the download for student activity', d1.downloads === 1 &
 check('Abacus total download counter increments', abacusState.get('petgabs-github-io-madv/downloads') === 1, abacusState.get('petgabs-github-io-madv/downloads'));
 const abacusFileKey = app.abacusResourceCounterKey(item);
 check('Abacus per-file counter increments', abacusState.get('petgabs-github-io-madv/' + abacusFileKey) === 1, abacusFileKey);
+check('the published file has its own Abacus /hit counter key',
+  abacusFileKey.startsWith('file-') && abacusRequests.some((request) => request.operation === 'hit' && request.key === abacusFileKey), abacusFileKey);
 await app.recordDownload(item, reg.student);
 await app.syncDownloadEvent(item, reg.student);
 const d2 = await app.syncStats();
@@ -221,6 +253,8 @@ check('the exact file is stored in the student record', app.state.students.find(
 check('My learning lists the file with its count', /Practice/.test(window.document.querySelector('#ml-history-body').textContent) && /\d/.test(window.document.querySelector('#ml-history-body').textContent), window.document.querySelector('#ml-history-body').textContent);
 const studentKey = app.abacusStudentCounterKey(reg.student);
 const studentFileKey = app.abacusStudentFileCounterKey(reg.student, item);
+await eventually(() => abacusState.get('petgabs-github-io-madv/' + studentKey) === 3 &&
+  abacusState.get('petgabs-github-io-madv/' + studentFileKey) === 3);
 check('Abacus holds a counter for this student', abacusState.get('petgabs-github-io-madv/' + studentKey) === 3, abacusState.get('petgabs-github-io-madv/' + studentKey));
 check('Abacus holds a counter for this student and file', abacusState.get('petgabs-github-io-madv/' + studentFileKey) === 3, abacusState.get('petgabs-github-io-madv/' + studentFileKey));
 check('the student counter is stored locally for the dashboard', app.abacusStudentTotal(app.state.students.find((s) => s.id === reg.student.id)) === 3, app.abacusStudentTotal(app.state.students[0]));
@@ -232,6 +266,12 @@ check('My learning offers other year levels for download too', /Year 11 revision
 app.downloadResource(otherItem.id);
 await new Promise((r) => setTimeout(r, 250));
 check('a file from another year level downloads from My learning', otherItem.downloads === 1 && /Year 11 revision/.test(window.document.querySelector('#ml-history-body').textContent), { downloads: otherItem.downloads });
+const otherItemAbacusKey = app.abacusResourceCounterKey(otherItem);
+await eventually(() => abacusState.get('petgabs-github-io-madv/' + otherItemAbacusKey) === 1);
+check('each published file gets a separate Abacus counter',
+  otherItemAbacusKey !== abacusFileKey && abacusState.get('petgabs-github-io-madv/' + otherItemAbacusKey) === 1 &&
+  abacusState.get('petgabs-github-io-madv/' + abacusFileKey) === 3,
+  { firstFile: abacusState.get('petgabs-github-io-madv/' + abacusFileKey), otherFile: abacusState.get('petgabs-github-io-madv/' + otherItemAbacusKey) });
 
 console.log('\n5c. the published library merges download totals and last-download times');
 const publishedRow = { id: 'res_pub', title: 'Mirror', fileName: 'mirror.pdf', source: 'cloud', path: 'Year 12/mirror.pdf', downloads: 0 };
@@ -415,8 +455,9 @@ async function secondBrowser(options = {}) {
       w.fetch = (input, init) => {
         const url = typeof input === 'string' ? input : input.url;
         const opts = init || {};
-        const json = (status, body) => Promise.resolve({
+        const json = (status, body, headers = {}) => Promise.resolve({
           status, ok: status >= 200 && status < 300,
+          headers: { get: (name) => headers[name] || headers[String(name).toLowerCase()] || null },
           json: () => Promise.resolve(body), text: () => Promise.resolve(JSON.stringify(body))
         });
         if (simulatedOffline && String(url).startsWith('https://abacus.jasoncameron.dev/')) return Promise.reject(new Error('offline'));
