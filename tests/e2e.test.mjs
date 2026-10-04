@@ -42,7 +42,7 @@ const storageSnapshot = (w) => {
 };
 
 const syncConfig = JSON.stringify({ provider: 'supabase', url: backend.url, publishableKey: 'sb_publishable_test' });
-const githubState = { cloudData: null, syncConfig: null, library: { resources: [] } };
+const githubState = { cloudData: null, syncConfig: null, library: { resources: [] }, files: {}, deleted: [] };
 const abacusState = new Map();
 const abacusFailOnce = new Set();
 const abacusRateLimitOnce = new Set();
@@ -113,12 +113,19 @@ const dom = new JSDOM(html, {
         const path = new URL(url).pathname;
         if (opts.method === 'PUT') {
           const body = JSON.parse(opts.body || '{}');
-          if (path.includes('sync-config.json')) githubState.syncConfig = JSON.parse(Buffer.from(body.content || '', 'base64').toString() || '{}');
-          if (path.includes('cloud-data.json')) githubState.cloudData = JSON.parse(Buffer.from(body.content || '', 'base64').toString() || '{}');
+          const decoded = Buffer.from(body.content || '', 'base64').toString() || '{}';
+          if (path.includes('sync-config.json')) githubState.syncConfig = JSON.parse(decoded);
+          if (path.includes('cloud-data.json')) githubState.cloudData = JSON.parse(decoded);
+          if (path.includes('library.json')) githubState.library = JSON.parse(decoded);
+          githubState.files[path] = { sha: 'sha1', content: body.content || '' };
           return json(200, { content: { sha: 'sha1' }, commit: { sha: 'abc' } });
         }
-        if (opts.method === 'DELETE') return json(200, { commit: {} });
-        return json(200, { sha: 'sha1', content: '' });
+        if (opts.method === 'DELETE') {
+          githubState.deleted.push(path);
+          delete githubState.files[path];
+          return json(200, { commit: {} });
+        }
+        return json(200, { sha: 'sha1', content: githubState.files[path] ? githubState.files[path].content : '' });
       }
       // everything else goes to the fake Supabase
       return fetch(url.startsWith('http') ? url : backend.url + url, opts);
@@ -170,33 +177,38 @@ check('blocked student refused everywhere', await (async () => {
 })());
 await app.syncAdminStudent('upsert', Object.assign({}, reg.student, { status: 'active' }));
 
-console.log('\n4. every full page load counts as an Abacus page view');
+console.log('\n4. a new visit or new login counts; a browser refresh does not');
 app.state.students = app.state.students.filter((s) => s.id !== reg.student.id);
 app.state.students.push(reg.student);
 app.saveStudents();
 app.state.session = { role: 'student', studentId: reg.student.id, at: new Date().toISOString() };
 app.saveSession();
-// Let the initial pages finish their first counter calls so each reload below
-// can prove that it adds exactly one new Abacus hit.
 await new Promise((r) => setTimeout(r, 900));
 const visitCounterId = app.ABACUS_NAMESPACE + '/visits';
 const pageViewsBefore = abacusState.get(visitCounterId) || 0;
 const guestPage = await secondBrowser({ noConfig: true });
 const guestLoadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 1);
-check('a guest full page load increments Abacus', guestLoadCounted, abacusState.get(visitCounterId));
+check('a guest first visit increments Abacus', guestLoadCounted, abacusState.get(visitCounterId));
 const guestReload = await secondBrowser({ noConfig: true, storage: storageSnapshot(guestPage.window) });
-const guestReloadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 2);
-check('reloading as the same guest increments Abacus again', guestReloadCounted, abacusState.get(visitCounterId));
-const registeredPage = await secondBrowser({ storage: storageSnapshot(app) });
-const registeredLoadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 3);
-check('a registered signed-in page load increments Abacus',
+const guestReloadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 1, 1500);
+check('refreshing the same guest tab does not increment Abacus', guestReloadCounted && abacusState.get(visitCounterId) === pageViewsBefore + 1, abacusState.get(visitCounterId));
+const newTabStorage = storageSnapshot(app);
+if (newTabStorage.session) delete newTabStorage.session['madv.visit-session.v1'];
+const registeredPage = await secondBrowser({ storage: newTabStorage });
+const registeredLoadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 2);
+check('a new tab visit as a signed-in student increments Abacus',
   registeredLoadCounted && registeredPage.window.currentStudent() && registeredPage.window.currentStudent().username === 'ada',
   { total: abacusState.get(visitCounterId), student: registeredPage.window.currentStudent() && registeredPage.window.currentStudent().username });
 const returningPage = await secondBrowser({ storage: storageSnapshot(registeredPage.window) });
-const returningLoadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 4);
-check('a returning student reload increments Abacus again',
-  returningLoadCounted && returningPage.window.currentStudent() && returningPage.window.currentStudent().username === 'ada',
+const returningLoadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 2, 1500);
+check('refreshing the signed-in tab does not increment Abacus',
+  returningLoadCounted && returningPage.window.currentStudent() && returningPage.window.currentStudent().username === 'ada' && abacusState.get(visitCounterId) === pageViewsBefore + 2,
   { total: abacusState.get(visitCounterId), student: returningPage.window.currentStudent() && returningPage.window.currentStudent().username });
+const loginBrowser = await secondBrowser();
+const loginVisitBefore = abacusState.get(visitCounterId) || 0;
+await guard(() => loginBrowser.window.loginStudent('ada', 'ada12'));
+const loginCounted = await eventually(() => abacusState.get(visitCounterId) === loginVisitBefore + 1);
+check('a new student login increments Abacus', loginCounted && loginBrowser.window.currentStudent(), abacusState.get(visitCounterId));
 
 console.log('\n4b. visitor counter remains shared with the detailed backend');
 const before = Number(app.state.counters.visits);
@@ -212,7 +224,7 @@ await other.window.syncVisit();
 const stats3 = await app.syncStats();
 check('a different device adds a unique visitor', stats3.uniqueVisitors >= 2, stats3.uniqueVisitors);
 await app.loadAbacusTotals(true);
-check('Abacus stores the shared visit total', abacusState.get('petgabs-github-io-madv/visits') >= pageViewsBefore + 5, abacusState.get('petgabs-github-io-madv/visits'));
+check('Abacus stores the shared visit total', abacusState.get('petgabs-github-io-madv/visits') >= pageViewsBefore + 3, abacusState.get('petgabs-github-io-madv/visits'));
 check('Abacus connection is visible to the app', app.state.abacus.status === 'ok', app.state.abacus.status);
 await other.window.loadAbacusTotals(true);
 check('a second browser reads the same Abacus total', other.window.state.counters.visits === abacusState.get('petgabs-github-io-madv/visits'), other.window.state.counters.visits);
@@ -350,7 +362,7 @@ const publishedRow = { id: 'res_pub', title: 'Mirror', fileName: 'mirror.pdf', s
 app.state.resources.push(publishedRow);
 const rowsBeforeMerge = app.state.resources.length;
 const mergedAdded = app.mergeCloudResources([{ id: 'res_pub', fileName: 'mirror.pdf', path: 'Year 12/mirror.pdf', downloads: 9, lastDownloadAt: '2026-10-01T05:00:00Z' }]);
-check('a merge into an existing row adds no duplicate', mergedAdded === 0 && app.state.resources.length === rowsBeforeMerge, { added: mergedAdded, rows: app.state.resources.length });
+check('a merge into an existing row adds no duplicate', mergedAdded.added === 0 && app.state.resources.length === rowsBeforeMerge, { added: mergedAdded, rows: app.state.resources.length });
 check('the published download total is merged', publishedRow.downloads === 9, publishedRow.downloads);
 check('the published last-download time is merged', publishedRow.lastDownloadAt === '2026-10-01T05:00:00Z', publishedRow.lastDownloadAt);
 const storedRows = JSON.parse(window.localStorage.getItem('madv.resources.v2'));
@@ -412,6 +424,20 @@ check('the student profile shows a per-file Abacus counter for every file taken'
   !!revisionRow && /^1$/.test(revisionRow.querySelector('[data-profile-file]').textContent.trim()),
   { practice: practiceRow && practiceRow.querySelector('[data-profile-file]').textContent, revision: revisionRow && revisionRow.querySelector('[data-profile-file]').textContent });
 app.closeModal();
+
+console.log('\n6c. admin delete removes the file from GitHub, library.json and the website');
+const doomed = {
+  id: 'res-delete-me', title: 'Doomed worksheet', fileName: 'doomed.pdf', path: 'resources/Year 11/doomed.pdf',
+  source: 'cloud', year: 'Year 11', category: 'Worksheet', topic: 'Algebra', visible: true, ext: 'pdf', kind: 'document'
+};
+app.state.resources.push(doomed);
+githubState.library.resources = [{ id: doomed.id, fileName: doomed.fileName, path: doomed.path, title: doomed.title, year: doomed.year }];
+app.setToken('ghp_test_token');
+const deleted = await app.deleteFromCloud(doomed);
+check('cloud delete reports success', deleted === true);
+check('the file is removed from the in-memory website library', !app.state.resources.some((r) => r.id === 'res-delete-me'));
+check('GitHub Contents API deleted the blob', githubState.deleted.some((p) => p.includes('doomed.pdf')), githubState.deleted);
+check('library.json no longer lists the file', !(githubState.library.resources || []).some((r) => r.id === 'res-delete-me' || r.fileName === 'doomed.pdf'), githubState.library);
 
 console.log('\n7. the repository mirror never receives passwords');
 const payloadText = JSON.stringify(app.cloudDataPayload());
