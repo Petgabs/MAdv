@@ -1,7 +1,7 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T18:22:50.300Z",
+  "updatedAt": "2026-10-04T18:24:55.118Z",
   "resources": [
     {
       "id": "res_muu4yb47bq348b",
@@ -50,7 +50,7 @@
       "published": true
     },
     {
-      "id": "res_muu5f5bfkwe9dq",
+      "id": "res_muu5f8vk7v0o61",
       "title": "Sample Quiz",
       "fileName": "sample-quiz.html",
       "ext": "html",
@@ -69,6 +69,29 @@
       "visible": true,
       "visibility": "all",
       "path": "resources/Year 11/sample-quiz.html",
+      "source": "cloud",
+      "published": true
+    },
+    {
+      "id": "res_muu5htmlco9xhq",
+      "title": "Year 12 Mathematics Advanced MCQ Revision (2)",
+      "fileName": "Year_12_Mathematics_Advanced_MCQ_Revision (2).html",
+      "ext": "html",
+      "kind": "app",
+      "year": "Year 12",
+      "topic": "Mixed revision — all topics",
+      "category": "Revision questions",
+      "description": "",
+      "owner": "peter82",
+      "department": "Mathematics",
+      "keywords": [],
+      "addedAt": "2026-10-04T18:24:55.101Z",
+      "bytes": 5007369,
+      "downloads": 0,
+      "lastDownloadAt": null,
+      "visible": true,
+      "visibility": "all",
+      "path": "resources/Year 12/Year_12_Mathematics_Advanced_MCQ_Revision (2).html",
       "source": "cloud",
       "published": true
     }
