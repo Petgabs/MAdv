@@ -1,6 +1,30 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-03T12:39:10.536Z",
-  "resources": []
+  "updatedAt": "2026-10-04T08:21:44.368Z",
+  "resources": [
+    {
+      "id": "res_musdpe0cjuawqo",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "ext": "html",
+      "kind": "app",
+      "year": "Year 12",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "description": "",
+      "owner": "peter82",
+      "department": "Mathematics",
+      "keywords": [],
+      "addedAt": "2026-10-03T12:39:12.684Z",
+      "bytes": 6208348,
+      "downloads": 1,
+      "lastDownloadAt": "2026-10-04T08:04:41.162Z",
+      "visible": true,
+      "visibility": "all",
+      "path": "resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "source": "cloud",
+      "published": true
+    }
+  ]
 }
