@@ -4663,7 +4663,7 @@ function saveSyncConfig() {
       publishableKey: cfg.key
     }, null, 2);
     ghGetFile(path).then(function (existing) {
-      return ghPutFile(path, b64EncodeText(payload), 'Configure the shared Supabase backend', existing ? existing.sha : undefined);
+      return ghPutFileAgain(path, b64EncodeText(payload), 'Configure the shared Supabase backend', existing ? existing.sha : undefined);
     }).then(function () {
       toast('Shared backend saved to the repository — every device will connect automatically.', 'success');
       return syncNow(true);
@@ -4790,7 +4790,14 @@ function ghFetch(url, options) {
       try { data = text ? JSON.parse(text) : null; } catch (err) { data = { raw: text }; }
       if (!res.ok) {
         var msg = (data && data.message) || res.statusText || 'GitHub request failed';
-        var error = new Error(msg + ' (HTTP ' + res.status + ')');
+        if (res.status === 422) {
+          // GitHub's raw response is usually an opaque "sha wasn't supplied"
+          // message. Explain the recoverable file-name / update race instead.
+          msg = 'GitHub could not save this change (HTTP 422). The file may already exist or may have changed while publishing. Please retry; for a new upload, choose a different name.';
+        } else {
+          msg += ' (HTTP ' + res.status + ')';
+        }
+        var error = new Error(msg);
         error.status = res.status;
         throw error;
       }
@@ -4804,8 +4811,15 @@ function ghGetFile(path) {
   var url = 'https://api.github.com/repos/' + repo.full + '/contents/' + encodePath(path) +
     '?ref=' + encodeURIComponent(state.settings.branch || 'main') + '&t=' + Date.now();
   return ghFetch(url).then(function (data) {
-    if (!data || typeof data.content !== 'string') throw new Error('Unexpected response for ' + path);
-    return { path: path, sha: data.sha, text: b64DecodeText(data.content), size: data.size };
+    if (!data || typeof data.sha !== 'string') throw new Error('Unexpected response for ' + path);
+    // The Contents API can omit a large blob's body while still returning its
+    // SHA and size. Those metadata are enough to reserve a name or update it.
+    return {
+      path: path,
+      sha: data.sha,
+      text: typeof data.content === 'string' ? b64DecodeText(data.content) : null,
+      size: data.size
+    };
   }).catch(function (err) {
     if (err.status === 404) return null;
     throw err;
@@ -4820,6 +4834,18 @@ function ghPutFile(path, base64Content, message, sha) {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
+  });
+}
+// For an intentional in-place update, a 422 can mean another write landed
+// after the caller read the file's SHA. Refresh that SHA and retry exactly once.
+// New uploads must use ghPutUploadedFile instead: they are never allowed to
+// replace another file, even if a same-name write races our availability read.
+function ghPutFileAgain(path, base64Content, message, sha) {
+  return ghPutFile(path, base64Content, message, sha).catch(function (err) {
+    if (err.status !== 422) throw err;
+    return ghGetFile(path).then(function (latest) {
+      return ghPutFile(path, base64Content, message, latest ? latest.sha : undefined);
+    });
   });
 }
 function ghDeleteFile(path, sha, message) {
@@ -4901,7 +4927,7 @@ function pushLibrary(expect) {
   var write = function (attemptsLeft) {
     var text = JSON.stringify(cloudLibraryPayload(), null, 2);
     return ghGetFile('library.json').then(function (existing) {
-      return ghPutFile('library.json', b64EncodeText(text),
+      return ghPutFileAgain('library.json', b64EncodeText(text),
         'Subject cloud: update resource list (' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC)',
         existing ? existing.sha : undefined);
     }).then(function () {
@@ -5286,7 +5312,7 @@ function pushCloudData(silent) {
     var path = String(state.settings.dataDir || 'data').replace(/\/+$/, '') + '/cloud-data.json';
     var text = JSON.stringify(cloudDataPayload(), null, 2);
     return ghGetFile(path).then(function (existing) {
-      return ghPutFile(path, b64EncodeText(text),
+      return ghPutFileAgain(path, b64EncodeText(text),
         'Subject cloud: sync counters and student records', existing ? existing.sha : undefined);
     }).then(function () {
       if (!silent) toast('Counters and student records pushed to the cloud.', 'success');
@@ -5324,6 +5350,40 @@ function fileToBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+// Create uploads never replace an existing resource. Check the original name,
+// then dated copies and numbered copies; if another writer claims a name after
+// we checked it, GitHub returns 422 and we move on to the next candidate.
+function ghPutUploadedFile(path, base64Content, message) {
+  var stamp = new Date().toISOString().slice(0, 10);
+  var slash = path.lastIndexOf('/');
+  var dot = path.lastIndexOf('.');
+  var hasExtension = dot > slash + 1;
+  var stem = hasExtension ? path.slice(0, dot) : path;
+  var extension = hasExtension ? path.slice(dot) : '';
+  var maxCandidates = 1000;
+
+  function candidateFor(index) {
+    if (index === 0) return path;
+    var number = index === 1 ? '' : ' ' + index;
+    return stem + ' (' + stamp + ')' + number + extension;
+  }
+  function tryCandidate(index) {
+    if (index >= maxCandidates) {
+      return Promise.reject(new Error('Could not find a free name for ' + baseName(path) + ' after checking ' + maxCandidates + ' possible names.'));
+    }
+    var candidate = candidateFor(index);
+    return ghGetFile(candidate).then(function (existing) {
+      if (existing) return tryCandidate(index + 1);
+      return ghPutFile(candidate, base64Content, message).then(function (res) {
+        return { path: candidate, commit: res && res.commit ? res.commit : null };
+      }, function (err) {
+        if (err.status === 422) return tryCandidate(index + 1);
+        throw err;
+      });
+    });
+  }
+  return tryCandidate(0);
+}
 // Commits the chosen file to the repository, registers the resource on the
 // website and only then writes library.json. That order matters: library.json
 // is the list every other device reads, so the new file has to be part of the
@@ -5336,16 +5396,8 @@ function uploadToCloud(file, meta, onProgress, onCommitted) {
   if (onProgress) onProgress(10, 'Reading the file…');
   return fileToBase64(file).then(function (b64) {
     if (onProgress) onProgress(35, 'Uploading to ' + repo.full + '…');
-    return ghGetFile(path).then(function (existing) {
-      var finalPath = path;
-      if (existing) {
-        var dot = path.lastIndexOf('.');
-        var stamp = new Date().toISOString().slice(0, 10);
-        finalPath = (dot > 0 ? path.slice(0, dot) : path) + ' (' + stamp + ')' + (dot > 0 ? path.slice(dot) : '');
-      }
-      return ghPutFile(finalPath, b64, 'Subject cloud: add ' + file.name + ' (' + meta.year + ' · ' + meta.category + ')')
-        .then(function (res) { return { path: finalPath, commit: res && res.commit ? res.commit : null }; });
-    });
+    return ghPutUploadedFile(path, b64,
+      'Subject cloud: add ' + file.name + ' (' + meta.year + ' · ' + meta.category + ')');
   }).then(function (uploaded) {
     var entry = {
       source: 'cloud',
