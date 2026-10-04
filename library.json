@@ -1,7 +1,7 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T18:14:36.615Z",
+  "updatedAt": "2026-10-04T18:19:01.721Z",
   "resources": [
     {
       "id": "res_muu4yb47bq348b",
@@ -46,6 +46,29 @@
       "visible": true,
       "visibility": "all",
       "path": "resources/Year 11/attendance_sheet.pdf",
+      "source": "cloud",
+      "published": true
+    },
+    {
+      "id": "res_muu5a8y9lsflyu",
+      "title": "MathsAdvanced MCQ Revision",
+      "fileName": "MathsAdvanced_MCQ_Revision (2026-10-04).html",
+      "ext": "html",
+      "kind": "app",
+      "year": "Year 11",
+      "topic": "Mixed revision — all topics",
+      "category": "Revision questions",
+      "description": "",
+      "owner": "peter82",
+      "department": "Mathematics",
+      "keywords": [],
+      "addedAt": "2026-10-04T18:19:01.713Z",
+      "bytes": 692236,
+      "downloads": 0,
+      "lastDownloadAt": null,
+      "visible": true,
+      "visibility": "all",
+      "path": "resources/Year 11/MathsAdvanced_MCQ_Revision (2026-10-04).html",
       "source": "cloud",
       "published": true
     }
