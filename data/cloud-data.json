@@ -2,7 +2,7 @@
   "_comment": "Mirror of the shared backend (Supabase), written automatically by .github/workflows/cloud-sync.yml. Public: holds names, usernames and counts, never passwords.",
   "source": "shared-backend",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T17:37:51Z",
+  "updatedAt": "2026-10-04T21:35:49Z",
   "counters": {
     "day": "2026-10-05",
     "daily": {
@@ -11,15 +11,15 @@
         "downloads": 15
       },
       "2026-10-05": {
-        "visits": 4,
-        "downloads": 14
+        "visits": 9,
+        "downloads": 28
       }
     },
-    "visits": 15,
-    "downloads": 29,
-    "visitsToday": 4,
-    "downloadsToday": 14,
-    "uniqueVisitors": 4
+    "visits": 20,
+    "downloads": 43,
+    "visitsToday": 9,
+    "downloadsToday": 28,
+    "uniqueVisitors": 5
   },
   "students": [
     {
@@ -30,10 +30,10 @@
       "clientId": "stu_mutr1rxledhcqy",
       "username": "liam",
       "firstName": "Liam",
-      "lastVisit": "2026-10-04T17:15:14Z",
-      "visitCount": 3,
+      "lastVisit": "2026-10-04T18:40:08Z",
+      "visitCount": 4,
       "registeredAt": "2026-10-04T11:41:03Z",
-      "downloadCount": 4,
+      "downloadCount": 8,
       "passwordRule": "username + year number (kept in the shared backend)"
     },
     {
@@ -44,10 +44,10 @@
       "clientId": "stu_mutw6myu2cgd5o",
       "username": "christine",
       "firstName": "Christine",
-      "lastVisit": "2026-10-04T17:14:14Z",
-      "visitCount": 5,
+      "lastVisit": "2026-10-04T18:39:05Z",
+      "visitCount": 6,
       "registeredAt": "2026-10-04T14:04:49Z",
-      "downloadCount": 11,
+      "downloadCount": 21,
       "passwordRule": "username + year number (kept in the shared backend)"
     },
     {
@@ -66,6 +66,22 @@
     }
   ],
   "logins": [
+    {
+      "at": "2026-10-04T18:32:19Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Liam",
+      "year": "Year 11",
+      "studentId": "stu_mutr1rxledhcqy"
+    },
+    {
+      "at": "2026-10-04T18:19:52Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Christine",
+      "year": "Year 10",
+      "studentId": "stu_mutw6myu2cgd5o"
+    },
     {
       "at": "2026-10-04T17:15:01Z",
       "ok": true,
@@ -204,6 +220,188 @@
     }
   ],
   "downloads": [
+    {
+      "at": "2026-10-04T18:39:37Z",
+      "year": "Year 11",
+      "title": "Teacher Schedule App (7)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Teacher_Schedule_App (7).html",
+      "studentId": "stu_mutr1rxledhcqy",
+      "resourceId": "res_muu5z4u5j4776y",
+      "resourceKey": "path:resources/Year 11/Teacher_Schedule_App (7).html",
+      "studentName": "Liam",
+      "studentYear": "Year 11"
+    },
+    {
+      "at": "2026-10-04T18:38:33Z",
+      "year": "Year 11",
+      "title": "Teacher Schedule App (7)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Teacher_Schedule_App (7).html",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu5z4u5j4776y",
+      "resourceKey": "path:resources/Year 11/Teacher_Schedule_App (7).html",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T18:34:50Z",
+      "year": "Year 11",
+      "title": "Sample Quiz",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "sample-quiz.html",
+      "studentId": "stu_mutr1rxledhcqy",
+      "resourceId": "res_muu5f8vk7v0o61",
+      "resourceKey": "path:resources/Year 11/sample-quiz.html",
+      "studentName": "Liam",
+      "studentYear": "Year 11"
+    },
+    {
+      "at": "2026-10-04T18:33:22Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice NEW",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice-NEW.html",
+      "studentId": "stu_mutr1rxledhcqy",
+      "resourceId": "res_muu5l0tvualm1c",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice-NEW.html",
+      "studentName": "Liam",
+      "studentYear": "Year 11"
+    },
+    {
+      "at": "2026-10-04T18:32:06Z",
+      "year": "Year 11",
+      "title": "MathsAdvanced MCQ Revision (2026-10-04)",
+      "topic": "Mixed revision — all topics",
+      "category": "Revision questions",
+      "fileName": "MathsAdvanced_MCQ_Revision (2026-10-04).html",
+      "studentId": "stu_mutr1rxledhcqy",
+      "resourceId": "res_muu5qchrxvag9m",
+      "resourceKey": "path:resources/Year 11/MathsAdvanced_MCQ_Revision (2026-10-04).html",
+      "studentName": "Liam",
+      "studentYear": "Year 11"
+    },
+    {
+      "at": "2026-10-04T18:31:10Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu4yb47bq348b",
+      "resourceKey": "path:resources/Year 12/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T18:30:56Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu4yb47bq348b",
+      "resourceKey": "path:resources/Year 12/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T18:30:00Z",
+      "year": "Year 11",
+      "title": "Attendance Sheet",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "attendance_sheet.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu54ke0ih6c4c",
+      "resourceKey": "path:resources/Year 11/attendance_sheet.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T18:29:16Z",
+      "year": "Year 11",
+      "title": "Sample Quiz",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "sample-quiz.html",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu5f8vk7v0o61",
+      "resourceKey": "path:resources/Year 11/sample-quiz.html",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T18:27:10Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced MCQ Revision (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Revision questions",
+      "fileName": "Year_12_Mathematics_Advanced_MCQ_Revision (2).html",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu5htmlco9xhq",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_MCQ_Revision (2).html",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T18:20:34Z",
+      "year": "Year 11",
+      "title": "MathsAdvanced MCQ Revision",
+      "topic": "Mixed revision — all topics",
+      "category": "Revision questions",
+      "fileName": "MathsAdvanced_MCQ_Revision (2026-10-04).html",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu5a8y9lsflyu",
+      "resourceKey": "path:resources/Year 11/MathsAdvanced_MCQ_Revision (2026-10-04).html",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T18:19:44Z",
+      "year": "Year 11",
+      "title": "MathsAdvanced MCQ Revision",
+      "topic": "Mixed revision — all topics",
+      "category": "Revision questions",
+      "fileName": "MathsAdvanced_MCQ_Revision (2026-10-04).html",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu5a8y9lsflyu",
+      "resourceKey": "path:resources/Year 11/MathsAdvanced_MCQ_Revision (2026-10-04).html",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T18:19:39Z",
+      "year": "Year 11",
+      "title": "Attendance Sheet",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "attendance_sheet.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu54ke0ih6c4c",
+      "resourceKey": "path:resources/Year 11/attendance_sheet.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T18:19:33Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu4yb47bq348b",
+      "resourceKey": "path:resources/Year 12/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
     {
       "at": "2026-10-04T17:18:23Z",
       "year": "Year 12",
@@ -583,6 +781,36 @@
     }
   ],
   "visits": [
+    {
+      "at": "2026-10-04T18:39:56Z",
+      "name": "Liam",
+      "year": "Year 11",
+      "studentId": "stu_mutr1rxledhcqy"
+    },
+    {
+      "at": "2026-10-04T18:32:03Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T18:28:35Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T18:15:43Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T17:38:08Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
     {
       "at": "2026-10-04T17:37:15Z",
       "name": "Visitor",
