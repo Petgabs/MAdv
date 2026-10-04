@@ -1,6 +1,6 @@
 {
   "_comment": "Public configuration only. The Supabase project URL and publishable key are safe to expose because Row Level Security restricts every request to the madv_* functions. Never store a secret key or a GitHub token here.",
   "provider": "supabase",
-  "url": "",
-  "publishableKey": ""
+  "url": "https://oingpzfpxcoshbytqevx.supabase.co",
+  "publishableKey": "sb_publishable_pf0hcYeRqWb8gHWd03kSEg_AuhErGho"
 }
