@@ -3407,6 +3407,7 @@ function mergeCloudResources(list) {
       local.source = 'cloud';
       local.published = true;
       local.downloads = Math.max(local.downloads || 0, remote.downloads || 0);
+      if (remote.lastDownloadAt && (!local.lastDownloadAt || new Date(remote.lastDownloadAt) > new Date(local.lastDownloadAt))) local.lastDownloadAt = remote.lastDownloadAt;
       if (remote.addedAt) local.addedAt = remote.addedAt;
     } else {
       state.resources.push(Object.assign({}, remote, {
@@ -5067,14 +5068,15 @@ function cloudSyncNow(silent) {
     state.cloud.loading = false;
     state.cloud.lastSync = new Date().toISOString();
     state.cloud.error = '';
-    return syncDownloadCounter(true).then(function () {
-      renderAll();
-      if (!silent) {
-        var info = results[0];
-        toast('Cloud library refreshed' + (info && info.total ? ' — ' + info.total + ' published file(s).' : '.') , 'success');
-      }
-      return results;
-    });
+    // pullLibrary() already merged the per-file download totals and
+    // last-download times from the published library into state.resources.
+    saveResources();
+    renderAll();
+    if (!silent) {
+      var info = results[0];
+      toast('Cloud library refreshed' + (info && info.total ? ' — ' + info.total + ' published file(s).' : '.'), 'success');
+    }
+    return results;
   }).catch(function (err) {
     state.cloud.loading = false;
     state.cloud.error = err.message;

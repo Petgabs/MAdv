@@ -25,6 +25,10 @@ const dom = new JSDOM(html, {
   pretendToBeVisual: true,
   beforeParse(window) {
     try { Object.defineProperty(window, 'crypto', { value: { randomUUID: () => require('node:crypto').randomUUID(), getRandomValues: (a) => require('node:crypto').randomFillSync(a) }, configurable: true }); } catch (e) {}
+    // jsdom has no TextEncoder/TextDecoder (real browsers do); the page uses
+    // them for the base64 GitHub payload encoding.
+    window.TextEncoder = TextEncoder;
+    window.TextDecoder = TextDecoder;
     window.fetch = (input, init) => {
       const url = typeof input === 'string' ? input : input.url;
       const opts = init || {};
@@ -205,6 +209,8 @@ async function secondBrowser(options = {}) {
     pretendToBeVisual: true,
     beforeParse(w) {
       try { Object.defineProperty(w, 'crypto', { value: { randomUUID: () => require('node:crypto').randomUUID(), getRandomValues: (a) => require('node:crypto').randomFillSync(a) }, configurable: true }); } catch (e) {}
+      w.TextEncoder = TextEncoder;
+      w.TextDecoder = TextDecoder;
       w.fetch = (input, init) => {
         const url = typeof input === 'string' ? input : input.url;
         const opts = init || {};
