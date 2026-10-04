@@ -1585,6 +1585,9 @@ table.data th.num{text-align:right}
             <select class="select" id="file-year-filter" aria-label="Filter files by year level"></select>
             <select class="select" id="file-category-filter" aria-label="Filter files by resource type"></select>
             <button type="button" class="btn btn--subtle btn--sm" data-action="export-files">Export CSV</button>
+            <button type="button" class="btn btn--subtle btn--sm" data-action="publish-all-pending" id="publish-pending-btn" hidden>
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-cloud-upload"/></svg> Publish waiting files
+            </button>
             <button type="button" class="btn btn--primary btn--sm" data-action="go-upload">
               <svg class="ico ico--sm" aria-hidden="true"><use href="#i-plus"/></svg> Upload file
             </button>
@@ -1825,10 +1828,10 @@ table.data th.num{text-align:right}
             <div class="notice notice--warn mb-4" id="upload-no-token" hidden>
               <svg class="ico ico--sm" aria-hidden="true"><use href="#i-alert-triangle"/></svg>
               <div>
-                <b>No access token saved.</b> The file will be stored in this browser only, so students on other devices
-                cannot download it yet.
+                <b>No access token saved.</b> The file is kept in this browser until a token is added, so students on
+                other devices cannot download it yet.
                 <button type="button" class="btn btn--link" data-action="go-settings">Add an access token</button>
-                to publish to the cloud.
+                and every waiting file is committed to GitHub and added to <code>library.json</code> automatically.
               </div>
             </div>
             <div class="row row--wrap">
@@ -4874,15 +4877,43 @@ function cloudLibraryPayload() {
     resources: state.resources.filter(function (r) { return r.source === 'cloud'; }).map(resourceForCloud)
   };
 }
-function pushLibrary() {
+// True when library.json (the published website list) contains this resource.
+function libraryListsResource(text, expect) {
+  if (!expect) return true;
+  try {
+    var data = JSON.parse(text);
+    var list = Array.isArray(data) ? data : (data && Array.isArray(data.resources) ? data.resources : []);
+    return list.some(function (entry) {
+      if (!entry) return false;
+      if (expect.id && entry.id === expect.id) return true;
+      if (expect.path && entry.path === expect.path) return true;
+      return !!(expect.fileName && entry.fileName === expect.fileName);
+    });
+  } catch (err) { return false; }
+}
+// Writes library.json in the repository. When `expect` is given the file is
+// read back through the GitHub API afterwards, so the page can prove the new
+// entry really is listed for every other device; one silent write failure is
+// repaired with a second attempt.
+function pushLibrary(expect) {
   var repo = repoParts();
   if (!repo || !currentToken()) return Promise.reject(new Error('Connect the access token and repository first.'));
-  var text = JSON.stringify(cloudLibraryPayload(), null, 2);
-  return ghGetFile('library.json').then(function (existing) {
-    return ghPutFile('library.json', b64EncodeText(text),
-      'Subject cloud: update resource list (' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC)',
-      existing ? existing.sha : undefined);
-  });
+  var write = function (attemptsLeft) {
+    var text = JSON.stringify(cloudLibraryPayload(), null, 2);
+    return ghGetFile('library.json').then(function (existing) {
+      return ghPutFile('library.json', b64EncodeText(text),
+        'Subject cloud: update resource list (' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC)',
+        existing ? existing.sha : undefined);
+    }).then(function () {
+      if (!expect) return true;
+      return ghGetFile('library.json').then(function (file) {
+        if (file && libraryListsResource(file.text, expect)) return true;
+        if (attemptsLeft > 0) return write(attemptsLeft - 1);
+        throw new Error('library.json did not keep the new entry for ' + (expect.path || expect.fileName || 'the uploaded file'));
+      });
+    });
+  };
+  return write(1);
 }
 function pullLibrary() {
   var url = libraryUrl();
@@ -4896,6 +4927,31 @@ function pullLibrary() {
     state.cloud.lastSync = new Date().toISOString();
     return { added: added.added, total: list.length, removed: added.removed };
   });
+}
+// A tab that stays open while the teacher uploads still picks the new files up:
+// the published list is re-read when this device has not seen it for a while.
+// This refresh only ever adds resources — it never prunes the local library.
+var LIBRARY_REFRESH_MS = 120000;
+var libraryRefreshPromise = null;
+function refreshPublishedLibrary(maxAgeMs) {
+  var url = libraryUrl();
+  if (!url || !state.settings.cloudSync || libraryRefreshPromise) return Promise.resolve(null);
+  var last = state.cloud.lastSync ? new Date(state.cloud.lastSync).getTime() : 0;
+  if (last && Date.now() - last < (maxAgeMs || 120000)) return Promise.resolve(null);
+  libraryRefreshPromise = fetch(url + '?t=' + Date.now(), { cache: 'no-store' }).then(function (res) {
+    if (!res.ok) throw new Error('library.json is not reachable (HTTP ' + res.status + ')');
+    return res.json();
+  }).then(function (data) {
+    var list = Array.isArray(data) ? data : (data && Array.isArray(data.resources) ? data.resources : []);
+    var merged = mergeCloudResources(list, false);
+    state.cloud.lastSync = new Date().toISOString();
+    if (merged.added) renderAll();
+    return merged;
+  }).catch(function () { return null; }).then(function (result) {
+    libraryRefreshPromise = null;
+    return result;
+  });
+  return libraryRefreshPromise;
 }
 function mergeCloudResources(list, pruneMissing) {
   var added = 0;
@@ -5268,7 +5324,11 @@ function fileToBase64(file) {
     reader.readAsDataURL(file);
   });
 }
-function uploadToCloud(file, meta, onProgress) {
+// Commits the chosen file to the repository, registers the resource on the
+// website and only then writes library.json. That order matters: library.json
+// is the list every other device reads, so the new file has to be part of the
+// list *before* the list is written — otherwise students never see the file.
+function uploadToCloud(file, meta, onProgress, onCommitted) {
   var path = cloudPath(file.name, meta.year);
   var repo = repoParts();
   if (!repo) return Promise.reject(new Error('Add the repository (owner/name) in Cloud settings first.'));
@@ -5287,15 +5347,19 @@ function uploadToCloud(file, meta, onProgress) {
         .then(function (res) { return { path: finalPath, commit: res && res.commit ? res.commit : null }; });
     });
   }).then(function (uploaded) {
-    if (onProgress) onProgress(75, 'Updating the resource list…');
-    return pushLibrary().then(function () {
+    var entry = {
+      source: 'cloud',
+      path: uploaded.path,
+      fileName: baseName(uploaded.path),
+      commit: uploaded.commit
+    };
+    // Hand the committed file to the caller now, so it is in state.resources
+    // (and therefore in cloudLibraryPayload) before library.json is written.
+    if (onCommitted) onCommitted(entry);
+    if (onProgress) onProgress(75, 'Updating the website list…');
+    return pushLibrary(entry).then(function () {
       if (onProgress) onProgress(100, 'Published.');
-      return {
-        source: 'cloud',
-        path: uploaded.path,
-        fileName: baseName(uploaded.path),
-        commit: uploaded.commit
-      };
+      return entry;
     });
   });
 }
@@ -5603,6 +5667,9 @@ function cardHtml(item) {
       buttons.push('<button type="button" class="btn btn--ghost btn--icon" title="Copy the download link" aria-label="Copy the download link" data-action="copy-link" data-id="' + attr(item.id) + '">' + svgIcon('link', 'ico--sm') + '</button>');
     }
     buttons.push('<button type="button" class="btn btn--ghost btn--icon" title="' + (item.visible === false ? 'Show to students' : 'Hide from students') + '" aria-label="' + (item.visible === false ? 'Show to students' : 'Hide from students') + '" data-action="toggle-visible" data-id="' + attr(item.id) + '">' + svgIcon(item.visible === false ? 'eye-off' : 'eye', 'ico--sm') + '</button>');
+    if (item.source === 'device' || item.libraryPending) {
+      buttons.push('<button type="button" class="btn btn--subtle btn--sm" data-action="publish-resource" data-id="' + attr(item.id) + '" title="Commit this file to GitHub and list it in library.json">' + svgIcon('cloud-upload', 'ico--sm') + ' Publish</button>');
+    }
     buttons.push('<button type="button" class="btn btn--ghost-danger btn--icon" title="Delete this resource" aria-label="Delete this resource" data-action="delete-resource" data-id="' + attr(item.id) + '">' + svgIcon('trash', 'ico--sm') + '</button>');
   }
   return '' +
@@ -5624,7 +5691,9 @@ function cardHtml(item) {
           '<span class="tag ' + categoryTagClass(item.category) + '">' + esc(item.category) + '</span>' +
           '<span class="tag ' + fresh.cls + '">' + svgIcon(fresh.icon, 'ico--sm') + ' ' + esc(fresh.label) + '</span>' +
           (guest ? '<span class="tag tag--amber">' + svgIcon('lock', 'ico--sm') + ' Account required</span>' : '') +
-          (item.source === 'device' ? '<span class="tag tag--amber">This device only</span>' : '') +
+          (item.source === 'device'
+            ? '<span class="tag tag--amber">' + (item.pendingPublish ? 'Waiting to publish' : 'This device only') + '</span>'
+            : (item.libraryPending ? '<span class="tag tag--amber">Website list pending</span>' : '')) +
         '</div>' +
         '<p class="rcard__desc">' + (item.description ? esc(item.description) : '<span class="muted-2">No description provided.</span>') + '</p>' +
         '<div class="row row--between row--wrap mb-3">' +
@@ -6048,11 +6117,14 @@ function renderFilesTable() {
       '<td class="num"><b>' + formatCount(r.downloads || 0) + '</b></td>' +
       '<td>' + esc(r.lastDownloadAt ? relativeTime(r.lastDownloadAt) : 'never') + '</td>' +
       '<td>' + (r.source === 'cloud'
-        ? '<span class="tag tag--emerald">Cloud</span>'
-        : '<span class="tag tag--amber">Device only</span>') + '</td>' +
+        ? (r.libraryPending ? '<span class="tag tag--amber">Website list pending</span>' : '<span class="tag tag--emerald">Cloud · in library.json</span>')
+        : '<span class="tag tag--amber">' + (r.pendingPublish === false ? 'Device only' : 'Waiting to publish') + '</span>') + '</td>' +
       '<td><div class="row-actions">' +
         '<button type="button" class="btn btn--subtle btn--xs" data-action="edit-resource" data-id="' + attr(r.id) + '">' + svgIcon('pencil', 'ico--sm') + ' Edit</button>' +
         (resourceUrls(r).raw ? '<button type="button" class="btn btn--subtle btn--xs" data-action="copy-link" data-id="' + attr(r.id) + '">' + svgIcon('link', 'ico--sm') + '</button>' : '') +
+        ((r.source === 'device' || r.libraryPending)
+          ? '<button type="button" class="btn btn--subtle btn--xs" data-action="publish-resource" data-id="' + attr(r.id) + '">' + svgIcon('cloud-upload', 'ico--sm') + ' Publish</button>'
+          : '') +
         '<button type="button" class="btn btn--subtle btn--xs" data-action="toggle-visible" data-id="' + attr(r.id) + '">' + svgIcon(r.visible === false ? 'eye-off' : 'eye', 'ico--sm') + '</button>' +
         '<button type="button" class="btn btn--ghost-danger btn--xs" data-action="delete-resource" data-id="' + attr(r.id) + '">' + svgIcon('trash', 'ico--sm') + '</button>' +
       '</div></td></tr>';
@@ -6062,8 +6134,12 @@ function renderFilesTable() {
   var storage = $('#storage-summary');
   if (storage) {
     var bytes = state.resources.reduce(function (s, r) { return s + (r.bytes || 0); }, 0);
+    var waiting = publishingResources().length;
     storage.textContent = 'Storage: ' + formatBytes(bytes) + ' across ' + formatCount(state.resources.length) + ' files · ' +
-      formatCount(state.resources.filter(function (r) { return r.source === 'device'; }).length) + ' on this device only';
+      formatCount(state.resources.filter(function (r) { return r.source === 'device'; }).length) + ' on this device only' +
+      (waiting ? ' · ' + formatCount(waiting) + ' waiting to publish' : '');
+    var pendingBtn = $('#publish-pending-btn');
+    if (pendingBtn) pendingBtn.hidden = !waiting;
   }
   var cloudSummary = $('#cloud-summary');
   if (cloudSummary) {
@@ -7213,6 +7289,35 @@ function currentUploadMeta() {
     visibility: $('#up-visibility').value
   };
 }
+// Builds the website record for a file that has just been stored in GitHub or
+// in this browser. `pendingPublish` marks a device-only file that is published
+// to GitHub automatically as soon as an access token is available.
+function uploadedResourceItem(entry, meta, file) {
+  var item = {
+    id: entry.id || uid('res'),
+    title: meta.title, fileName: entry.fileName || file.name, ext: meta.ext, kind: meta.kind,
+    year: meta.year, topic: meta.topic, category: meta.category, description: meta.description,
+    owner: meta.owner, department: meta.department, keywords: meta.keywords,
+    addedAt: new Date().toISOString(), bytes: file.size, downloads: 0, lastDownloadAt: null,
+    visible: meta.visible, visibility: meta.visibility,
+    path: entry.path || '', source: entry.source, published: entry.source === 'cloud',
+    commitUrl: entry.commit ? entry.commit.html_url : null,
+    pendingPublish: entry.source !== 'cloud',
+    libraryPending: false
+  };
+  return item;
+}
+// Adds the uploaded file to the library immediately, so it is already part of
+// library.json when that file is written and part of this device's view even if
+// the list write has to be retried later.
+function registerUploadedResource(entry, meta, file) {
+  var item = uploadedResourceItem(entry, meta, file);
+  state.resources.push(item);
+  saveResources();
+  try { store.remove(KEYS.tree); } catch (err) {}   // the cached repository tree is now out of date
+  renderAll();
+  return item;
+}
 function handleUploadSubmit(event) {
   if (event) event.preventDefault();
   var errorBox = $('#upload-error');
@@ -7243,50 +7348,125 @@ function handleUploadSubmit(event) {
   if (submit) submit.disabled = true;
 
   var canCloud = !!repoParts() && !!currentToken();
-  var start = canCloud ? uploadToCloud(file, meta, setProgress) : saveFileToDevice(file, meta, setProgress);
+  // The resource is added to the library as soon as the file itself is stored —
+  // before library.json is written — and remembered so a later failure is
+  // reported as "the website list needs a retry" instead of losing the file.
+  var item = null;
+  function onCommitted(entry) { item = registerUploadedResource(entry, meta, file); }
 
-  start.then(function (result) {
-    var item = {
-      id: result.id || uid('res'),
-      title: meta.title, fileName: result.fileName || file.name, ext: meta.ext, kind: meta.kind,
-      year: meta.year, topic: meta.topic, category: meta.category, description: meta.description,
-      owner: meta.owner, department: meta.department, keywords: meta.keywords,
-      addedAt: new Date().toISOString(), bytes: file.size, downloads: 0, lastDownloadAt: null,
-      visible: meta.visible, visibility: meta.visibility,
-      path: result.path || '', source: result.source, published: result.source === 'cloud',
-      commitUrl: result.commit ? result.commit.html_url : null
-    };
-    state.resources.push(item);
-    saveResources();
-    renderAll();
+  var start = canCloud
+    ? uploadToCloud(file, meta, setProgress, onCommitted)
+    : saveFileToDevice(file, meta, setProgress, onCommitted);
+
+  start.then(function (entry) {
+    if (!item) item = registerUploadedResource(entry, meta, file);
     state.busy = false;
     if (submit) submit.disabled = false;
     if (submitText) submitText.textContent = 'Upload resource';
     resetUploadForm();
-    if (result.source === 'cloud') {
-      toast('Published “' + item.title + '” to the cloud. Students can download it now.', 'success');
+    if (item.source === 'cloud') {
+      toast('Published “' + item.title + '” to GitHub — the file is in ' + state.settings.repo + ' and listed in library.json, so students can download it on their own computers.', 'success');
       showView('library');
     } else {
-      toast('Saved “' + item.title + '” in this browser. Add an access token in Cloud settings to publish it for students.', 'warn');
+      toast('Saved “' + item.title + '” in this browser. Save an access token in Cloud settings and it is published to GitHub and library.json automatically.', 'warn');
     }
   }).catch(function (err) {
     state.busy = false;
     if (submit) submit.disabled = false;
     if (submitText) submitText.textContent = 'Upload resource';
     if (progress) progress.hidden = true;
-    fail('Upload failed: ' + err.message);
+    if (!item) return fail('Upload failed: ' + err.message);
+    // The file reached GitHub (or this device) but the website list did not.
+    item.libraryPending = true;
+    saveResources();
+    renderAll();
+    resetUploadForm();
+    fail('“' + item.title + '” was saved ' + (item.source === 'cloud' ? 'in GitHub' : 'in this browser') +
+      ', but the website list (library.json) could not be updated: ' + err.message +
+      ' Press Publish on the file to try again.');
   });
 }
-function saveFileToDevice(file, meta, onProgress) {
+function saveFileToDevice(file, meta, onProgress, onCommitted) {
   if (onProgress) onProgress(20, 'Saving on this device…');
   var id = uid('res');
+  var entry = { source: 'device', path: '', fileName: file.name, id: id };
   return fileStore.put(id, file).then(function () {
     return fileStore.put(id + ':meta', { name: file.name, type: file.type, size: file.size, year: meta.year });
-  }).then(function () {
-    if (onProgress) onProgress(100, 'Saved.');
-    return { source: 'device', path: '', fileName: file.name, id: id };
   }).catch(function () {
     throw new Error('This browser refused to store the file (private mode or storage full). Connect an access token to publish to the cloud instead.');
+  }).then(function () {
+    if (onCommitted) onCommitted(entry);
+    if (onProgress) onProgress(100, 'Saved.');
+    return entry;
+  });
+}
+
+/* Publishing a file that is waiting on this device -----------------------
+   A file uploaded without an access token is kept in this browser and marked
+   `pendingPublish`. It is committed to the repository and added to
+   library.json as soon as a token is saved, or when the teacher presses
+   Publish on the file, so students can reach it from their own computers. */
+function publishResourceToCloud(item, onProgress) {
+  if (!item) return Promise.reject(new Error('That file is no longer in the library.'));
+  var repo = repoParts();
+  if (!repo) return Promise.reject(new Error('Add the repository (owner/name) in Cloud settings first.'));
+  if (!currentToken()) return Promise.reject(new Error('Save an access token before publishing to the cloud.'));
+  if (item.source === 'cloud') {
+    // The file is already in the repository — only the website list needs to be
+    // written (or written again after a failed attempt).
+    return pushLibrary(item).then(function () {
+      item.libraryPending = false;
+      saveResources();
+      renderAll();
+      return item;
+    });
+  }
+  if (onProgress) onProgress(5, 'Reading the file stored in this browser…');
+  return fileStore.get(item.id).then(function (blob) {
+    if (!blob) throw new Error('The file is no longer stored in this browser. Upload it again.');
+    var file = new File([blob], item.fileName, { type: blob.type || '' });
+    var meta = { year: item.year, category: item.category, title: item.title };
+    return uploadToCloud(file, meta, onProgress, function (entry) {
+      item.source = 'cloud';
+      item.path = entry.path;
+      item.fileName = entry.fileName;
+      item.commitUrl = entry.commit ? entry.commit.html_url : null;
+      item.published = true;
+      item.pendingPublish = false;
+      item.libraryPending = false;
+      saveResources();
+      renderAll();
+    });
+  }).then(function (entry) {
+    // GitHub now holds the file, so the browser copy is no longer needed.
+    return fileStore.del(item.id).then(function () { return fileStore.del(item.id + ':meta'); })
+      .catch(function () {})
+      .then(function () { return item; });
+  });
+}
+function publishingResources() {
+  return state.resources.filter(function (r) { return r.source === 'device' || r.pendingPublish || r.libraryPending; });
+}
+function publishPendingResources(silent) {
+  var pending = publishingResources();
+  if (!pending.length) return Promise.resolve(0);
+  if (!currentToken() || !repoParts()) {
+    if (!silent) toast('Save an access token and repository in Cloud settings first — then the files waiting on this device are published automatically.', 'warn');
+    return Promise.resolve(0);
+  }
+  var published = 0;
+  return pending.reduce(function (chain, item) {
+    return chain.then(function () {
+      return publishResourceToCloud(item).then(function () { published++; }, function (err) {
+        recordDiagnostic('upload', errorText(err), 'publishing ' + (item.fileName || item.title));
+      });
+    });
+  }, Promise.resolve()).then(function () {
+    if (published && !silent) {
+      toast('Published ' + published + ' file' + (published === 1 ? '' : 's') + ' waiting on this device to GitHub and library.json — students can download ' + (published === 1 ? 'it' : 'them') + ' now.', 'success');
+    }
+    renderAll();
+    return published;
   });
 }
 
@@ -7314,6 +7494,9 @@ function saveTokenFromForm() {
     renderSettings();
     renderAll();
     updateUploadMode();
+    // A file uploaded before the token existed is published to GitHub and
+    // library.json automatically now that the repository can be written to.
+    publishPendingResources();
   }).catch(function (err) {
     if (error) { error.hidden = false; error.textContent = err.message; }
     toast(err.message, 'error');
@@ -7431,8 +7614,8 @@ function updateUploadMode() {
   if (notice) notice.hidden = canCloud;
   var hint = $('#publish-hint');
   if (hint) hint.textContent = canCloud
-    ? 'The file is committed to ' + state.settings.repo + ' and listed in library.json, so every student device can download it.'
-    : 'Without an access token the file stays in this browser only. Add one in Cloud settings to publish for students.';
+    ? 'One press commits the file to ' + state.settings.repo + ', lists it in library.json and shows it to every student device — no separate publish step.'
+    : 'Without an access token the file is kept in this browser. Save one in Cloud settings and every waiting file is published to GitHub and library.json automatically.';
   var maxMB = uploadLimitMB();
   var maxLabel = $('#max-size-label');
   if (maxLabel) maxLabel.textContent = 'Maximum ' + maxMB + ' MB';
@@ -8104,6 +8287,23 @@ var ACTIONS = {
   },
   'edit-resource': function (el) { openEditResource(el.dataset.id); },
   'save-resource': function (el) { saveResourceEdits(el.dataset.id); },
+  'publish-resource': function (el) {
+    var item = findResource(el.dataset.id);
+    if (!item) return;
+    if (!currentToken() || !repoParts()) {
+      toast('Save an access token and repository in Cloud settings first.', 'warn');
+      return;
+    }
+    toast('Publishing “' + item.title + '” to GitHub…', 'info');
+    publishResourceToCloud(item).then(function () {
+      renderAll();
+      toast('“' + item.title + '” is in GitHub and listed in library.json — students can download it now.', 'success');
+    }).catch(function (err) {
+      renderAll();
+      toast('Could not publish: ' + err.message, 'error');
+    });
+  },
+  'publish-all-pending': function () { publishPendingResources(); },
   'delete-resource': function (el) {
     var item = findResource(el.dataset.id);
     if (!item) return;
@@ -8505,10 +8705,12 @@ function wireEvents() {
     abacusFlushQueue().then(function () { return loadAbacusTotals(true); })
       .then(function () { return syncAbacusFileTotals(true); });
     if (syncReady()) syncQueueFlush();
+    refreshPublishedLibrary(0);   // files uploaded while this device was offline
     if (state.view === 'dashboard' && currentAdmin()) refreshAdminRosterIfStale(true);
   });
   window.addEventListener('offline', updateConnectionState);
   window.addEventListener('focus', function () {
+    refreshPublishedLibrary(LIBRARY_REFRESH_MS);
     if (state.view === 'dashboard' && currentAdmin()) refreshAdminRosterIfStale(false);
   });
   document.addEventListener('visibilitychange', function () {
@@ -8516,6 +8718,7 @@ function wireEvents() {
     // Catch up on everything the tab skipped drawing while it was in the background.
     if (state.renderPending) { state.renderPending = false; renderAll(); }
     checkAdminIdle();
+    refreshPublishedLibrary(LIBRARY_REFRESH_MS);
     if (state.view === 'dashboard' && currentAdmin()) refreshAdminRosterIfStale(false);
   });
   window.addEventListener('beforeunload', function () { saveSession(); });

@@ -4,10 +4,11 @@
   "private": true,
   "description": "Mathematics Advanced subject cloud \u2014 a single-file GitHub Pages site with a Supabase-backed online student register. These packages are only needed to run the tests; the website itself has no dependencies.",
   "scripts": {
-    "test": "npm run test:schema && npm run test:e2e && npm run test:upload && npm run test:resilience",
+    "test": "npm run test:schema && npm run test:e2e && npm run test:upload && npm run test:publish && npm run test:resilience",
     "test:schema": "node backends/supabase/test-schema.mjs",
     "test:e2e": "node tests/e2e.test.mjs",
     "test:upload": "node tests/upload.test.mjs",
+    "test:publish": "node tests/publish.test.mjs",
     "sync:cloud-data": "node scripts/export-cloud-data.mjs",
     "test:resilience": "node tests/resilience.test.mjs"
   },

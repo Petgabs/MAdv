@@ -129,9 +129,26 @@ and write** so the job can commit.
 | 5 | **Upload Resource**: choose the file, give it a name, then set **Year level**, **Topic** and **Resource type**. Press **Upload resource**. |
 | 6 | Repeat for every resource. The library, `library.json` and student downloads update instantly. |
 
-Uploads are committed to the repository, so any device that opens the site can
-download them. **Without an access token** the app still works, but files are
-stored only in the browser that uploaded them and are marked *This device only*.
+**One press publishes everything.** *Upload resource* commits the file to the
+repository (`resources/<Year level>/…`), adds it to `library.json` and shows it
+in the website library, so students can open and download it from their own
+computers. The order is deliberate: the resource is registered in the site's
+library **before** `library.json` is written — that list is what every other
+device downloads — and the page reads `library.json` back through the GitHub API
+to prove the new file is really listed (a write GitHub silently drops is retried
+once). If the file reaches GitHub but the list write still fails, the file stays
+in the website library marked *Website list pending* and its **Publish** action
+(or **Publish waiting files** in the dashboard) repairs the list.
+
+**Without an access token** the app still works: files are stored in the browser
+that uploaded them, marked *Waiting to publish*, and committed to GitHub plus
+`library.json` **automatically** as soon as a token is saved in Cloud settings
+(or when **Publish** is pressed on the file).
+
+A student who already has the site open re-reads the published list when the tab
+is brought back to the front and the device has not synced for two minutes, so a
+file uploaded during the lesson appears without a reload. That background
+refresh only ever adds files — it never removes one the device already has.
 
 ## 4. What students do
 
@@ -203,8 +220,12 @@ add an option everywhere.
 * **Engagement analytics** — 14-day visit sparkline, plus downloads broken down
   by year level, resource type and topic, and a top-downloads ranking.
 * **File management** — every uploaded file with its download counter, last
-  download time, publishing status, and actions to edit details, copy the
-  public link, hide/show or delete (deleting also removes it from GitHub).
+  download time and publishing status (*Cloud · in library.json*,
+  *Website list pending*, *Waiting to publish* or *Device only*), a
+  **Publish** action that commits a waiting file (or repairs a list that failed
+  to write) and the actions to edit details, copy the public link, hide/show or
+  delete (deleting also removes it from GitHub). **Publish waiting files**
+  publishes everything still held on this device in one press.
 * **Reporting** — export the student register, download log, login log and file
   list as CSV; download or restore a full JSON backup; print a monitoring
   report; reset local daily charts; clear logs; wipe this device. Shared Abacus
@@ -256,8 +277,9 @@ add an option everywhere.
 
 | Data | Location |
 | --- | --- |
-| Uploaded files (published) | The GitHub repository, folder `resources/<Year level>/…` |
-| Resource list and cached per-file totals | `library.json` in the repository; live per-file totals are read from Abacus |
+| Uploaded files (published) | The GitHub repository, folder `resources/<Year level>/…` — committed by the upload itself, then read back to confirm |
+| Resource list and cached per-file totals | `library.json` in the repository (written after the new resource is registered, then read back and verified); live per-file totals are read from Abacus |
+| Files uploaded before a token was saved | The uploading browser's IndexedDB (marked *Waiting to publish*) until a token is saved and they are committed automatically |
 | Shared site-wide page-view/download totals (including published Interactive HTML opens), and the per-student and per-student-file download counters | Abacus counter API (`petgabs-github-io-madv` namespace; no key required — keys are hashes, never names or filenames) |
 | Live student register and detailed activity | Supabase (`madv_students`, `madv_visits`, `madv_downloads`, etc.) — required for online self-registration and cross-device sign-in; passwords stay here, never in GitHub's public mirror |
 | Supabase address (URL + publishable key, both public) | `data/sync-config.json` in the repository, and cached in each browser |
@@ -265,7 +287,6 @@ add an option everywhere.
 | Local working copy: students, logs, cached counters, settings, offline queues | Each browser's `localStorage` |
 | Student sign-in session | Each browser's `localStorage` (remembered between lessons) |
 | **Administrator sign-in session** | Tab `sessionStorage` only — closing the tab ends admin access |
-| Files uploaded without a token | The uploading browser's IndexedDB (this device only) |
 | Downloaded files, cached for 10 minutes | The browser's IndexedDB (`madv-files` → `cache`), ~120 MB oldest-first cap |
 | Sign-in lockout counter and diagnostics | Each browser's `localStorage` (this device only) |
 | Access token | Admin browser `localStorage` (or tab `sessionStorage` if *Forget when the tab closes* is ticked); never written to the HTML or repository |
@@ -355,7 +376,7 @@ sync** to publish counters only.
 | --- | --- |
 | A visitor says the Download button does nothing | That is the policy: downloads need a student account. Pressing **Download** explains how to register or log in, and the file is taken from **My learning**. |
 | The Abacus counter for a student reads 0 | The shared counter only moves after a signed-in student downloads from **My learning** on a device that can reach Abacus. Press **Abacus counters** in the register panel to re-read it. |
-| Students can't see uploaded files | Check that the repository is public, Pages is deployed, and `library.json` lists the file. A token is needed only in the admin browser to publish it. |
+| Students can't see uploaded files | Check that the repository is public, Pages is deployed, and `library.json` lists the file. A token is needed only in the admin browser to publish it. If the file shows *Waiting to publish* / *Website list pending*, press **Publish** on the file or **Publish waiting files** in the dashboard. |
 | Student cannot log in from a second device | Check **Cloud settings → Shared student register → Test connection**. Online registration is only confirmed after the shared backend accepts it; the admin dashboard refreshes the live roster when opened and on return to focus. |
 | Online registration is not ready | Configure the Supabase URL and publishable key in **Cloud settings → Shared student register**, then run `backends/supabase/schema.sql`. Registration is intentionally not completed on a single browser when this backend is unavailable. |
 | "Please use letters only for the first name" for an ordinary name | Fixed in this version: the name check used to reject almost every real name. Reload the page to pick up the new `index.html`. |
@@ -373,7 +394,7 @@ sync** to publish counters only.
 
 ```bash
 npm install     # PGlite (PostgreSQL in WASM) + jsdom, test-only
-npm test        # SQL/backend tests + end-to-end browser and exporter tests
+npm test        # SQL/backend + end-to-end browser, upload/publishing and resilience tests
 npm run sync:cloud-data   # write data/cloud-data.json from the shared backend now
 ```
 
