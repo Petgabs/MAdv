@@ -54,6 +54,8 @@ const dom = new JSDOM(html, {
   beforeParse(window) {
     try { Object.defineProperty(window, 'crypto', { value: { randomUUID: () => require('node:crypto').randomUUID(), getRandomValues: (a) => require('node:crypto').randomFillSync(a) }, configurable: true }); } catch (e) {}
     window.scrollTo = () => {};
+    window.URL.createObjectURL = () => '#test-blob';
+    window.URL.revokeObjectURL = () => {};
     try { Object.defineProperty(window, 'TextEncoder', { value: TextEncoder, configurable: true }); Object.defineProperty(window, 'TextDecoder', { value: TextDecoder, configurable: true }); } catch (e) {}
     window.fetch = (input, init) => {
       const url = typeof input === 'string' ? input : input.url;
@@ -69,6 +71,13 @@ const dom = new JSDOM(html, {
         if (url.includes('sync-config.json')) return json(githubState.syncConfig === null ? 404 : 200, githubState.syncConfig);
         if (url.includes('cloud-data.json')) return json(githubState.cloudData === null ? 404 : 200, githubState.cloudData);
         if (url.includes('library.json')) return json(200, githubState.library);
+        if (/\.pdf$/i.test(url.split('?')[0])) {
+          return Promise.resolve({
+            ok: true, status: 200,
+            blob: () => Promise.resolve(new window.Blob(['%PDF-1.4 test'], { type: 'application/pdf' })),
+            text: () => Promise.resolve('%PDF-1.4 test')
+          });
+        }
         return json(404, {});
       }
       if (url.includes('api.github.com')) {
@@ -177,6 +186,53 @@ other.window.state.resources = [remoteItem];
 await other.window.syncAbacusFileTotals(true);
 check('another browser fetches the same per-file total', remoteItem.downloads === 2, remoteItem.downloads);
 
+console.log('\n5b. an unregistered visitor cannot download; students download from My learning');
+app.state.session = null;
+app.saveSession();
+app.showView('library');
+app.renderLibrary();
+const guestCard = window.document.querySelector('#documents-list').textContent;
+check('the library card asks visitors to sign in', /Sign in to download/.test(guestCard) && /Account required/.test(guestCard), guestCard.slice(0, 120));
+check('the library explains the download policy', /Register and log in before you download/.test(window.document.querySelector('#download-policy').textContent));
+const downloadsBeforeGate = app.state.counters.downloads;
+const itemDownloadsBeforeGate = item.downloads;
+app.downloadResource(item.id);
+const gate = window.document.querySelector('[data-modal="download-gate"]');
+check('the download click shows a register-and-login message', !!gate && /register and log in/i.test(gate.textContent), gate && gate.querySelector('#modal-title').textContent);
+check('the gate offers register and log in', !!gate && /Register now/.test(gate.textContent) && /already have an account/.test(gate.textContent));
+check('nothing was downloaded or counted', app.state.counters.downloads === downloadsBeforeGate && item.downloads === itemDownloadsBeforeGate, { counters: app.state.counters.downloads, item: item.downloads });
+app.closeModal();
+
+app.state.session = { role: 'student', studentId: reg.student.id, at: new Date().toISOString() };
+app.saveSession();
+app.renderLibrary();
+app.showView('library');
+app.downloadResource(item.id);
+const pageGate = window.document.querySelector('[data-modal="download-gate"]');
+check('a signed-in student is sent to My learning to download', !!pageGate && /Download from My learning/.test(pageGate.textContent), pageGate && pageGate.querySelector('#modal-title').textContent);
+check('still nothing downloaded from the library view', app.state.counters.downloads === downloadsBeforeGate, app.state.counters.downloads);
+const expectedStudentDownloads = (app.state.students.find((s) => s.id === reg.student.id).downloadCount || 0) + 1;
+app.ACTIONS['gate-my-learning']({ dataset: { id: item.id } });
+await new Promise((r) => setTimeout(r, 300));
+check('the gate opens My learning and downloads there', app.state.view === 'my-learning', app.state.view);
+check('the shared download total moved once', app.state.counters.downloads === downloadsBeforeGate + 1, app.state.counters.downloads);
+check('the download is recorded against the student', app.state.students.find((s) => s.id === reg.student.id).downloadCount === expectedStudentDownloads, app.state.students.find((s) => s.id === reg.student.id).downloadCount);
+check('the exact file is stored in the student record', app.state.students.find((s) => s.id === reg.student.id).downloads[0].title === 'Practice', app.state.students.find((s) => s.id === reg.student.id).downloads[0]);
+check('My learning lists the file with its count', /Practice/.test(window.document.querySelector('#ml-history-body').textContent) && /1/.test(window.document.querySelector('#ml-history-body').textContent), window.document.querySelector('#ml-history-body').textContent);
+const studentKey = app.abacusStudentCounterKey(reg.student);
+const studentFileKey = app.abacusStudentFileCounterKey(reg.student, item);
+check('Abacus holds a counter for this student', abacusState.get('petgabs-github-io-madv/' + studentKey) === 3, abacusState.get('petgabs-github-io-madv/' + studentKey));
+check('Abacus holds a counter for this student and file', abacusState.get('petgabs-github-io-madv/' + studentFileKey) === 3, abacusState.get('petgabs-github-io-madv/' + studentFileKey));
+check('the student counter is stored locally for the dashboard', app.abacusStudentTotal(app.state.students.find((s) => s.id === reg.student.id)) === 3, app.abacusStudentTotal(app.state.students[0]));
+check('the download policy cannot be switched off', app.state.settings.requireLogin === true);
+const otherItem = { id: 'res2', title: 'Year 11 revision', fileName: 'b.pdf', source: 'cloud', path: 'Year 11/b.pdf', category: 'Revision questions', topic: 'Functions', year: 'Year 11', downloads: 0 };
+app.state.resources.push(otherItem);
+app.renderMyLearning();
+check('My learning offers other year levels for download too', /Year 11 revision/.test(window.document.querySelector('#ml-all').textContent), window.document.querySelector('#ml-all').textContent.slice(0, 120));
+app.downloadResource(otherItem.id);
+await new Promise((r) => setTimeout(r, 250));
+check('a file from another year level downloads from My learning', otherItem.downloads === 1 && /Year 11 revision/.test(window.document.querySelector('#ml-history-body').textContent), { downloads: otherItem.downloads });
+
 console.log('\n6. admin pulls the shared register live');
 app.loginAdmin('peter82', 'petgabs82');
 const added = await app.syncPullRoster();
@@ -199,6 +255,32 @@ check('a live roster refresh updates a changed status and removes deleted shared
   return liveAdmin.window.state.students.find((s) => s.username === 'ada').status === 'blocked' &&
     !liveAdmin.window.state.students.some((s) => s.username === liveRegistration.student.username);
 })());
+
+console.log('\n6b. the admin register shows each student\'s Abacus counter and the files they took');
+app.loginAdmin('peter82', 'petgabs82');
+const ada = app.state.students.find((s) => s.username === 'ada');
+const readTotal = await app.loadAbacusStudentTotal(ada, true);
+check('the per-student Abacus counter reads back', readTotal === 4, readTotal);
+const scanned = await app.refreshAbacusStudentTotals([ada]);
+check('the register button reads counters for listed students', scanned === 1 && app.abacusStudentTotal(ada) === 4, { scanned, total: app.abacusStudentTotal(ada) });
+app.showView('dashboard');
+app.renderDashboard();
+const registerText = window.document.querySelector('#students-body').textContent;
+check('the student register shows the Abacus counter beside the downloads', /Abacus 4/.test(registerText), registerText.slice(0, 200));
+check('the register panel reports the counters it read', /Abacus counters read for 2 of 2 listed students/.test(window.document.querySelector('#student-abacus-note').textContent), window.document.querySelector('#student-abacus-note').textContent);
+app.openStudentProfile(ada.id);
+await new Promise((r) => setTimeout(r, 600));
+const profile = window.document.querySelector('[data-modal="student-profile"]');
+check('the student profile lists the exact file downloaded', /Practice/.test(profile.textContent) && /a\.pdf/.test(profile.textContent), profile.textContent.slice(0, 160));
+check('the student profile names the Abacus counter', /Abacus counter/.test(profile.textContent) && /4 downloads/.test(profile.textContent), profile.textContent.slice(0, 200));
+const fileRows = Array.from(profile.querySelectorAll('tr')).filter((tr) => tr.querySelector('[data-profile-file]'));
+const practiceRow = fileRows.find((tr) => /Practice/.test(tr.textContent));
+const revisionRow = fileRows.find((tr) => /Year 11 revision/.test(tr.textContent));
+check('the student profile shows a per-file Abacus counter for every file taken',
+  !!practiceRow && /^3$/.test(practiceRow.querySelector('[data-profile-file]').textContent.trim()) &&
+  !!revisionRow && /^1$/.test(revisionRow.querySelector('[data-profile-file]').textContent.trim()),
+  { practice: practiceRow && practiceRow.querySelector('[data-profile-file]').textContent, revision: revisionRow && revisionRow.querySelector('[data-profile-file]').textContent });
+app.closeModal();
 
 console.log('\n7. the repository mirror never receives passwords');
 const payloadText = JSON.stringify(app.cloudDataPayload());

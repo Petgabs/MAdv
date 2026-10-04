@@ -730,7 +730,8 @@ table.data th.num{text-align:right}
             <h2 class="hero__title" id="student-dashboard-heading">Ready for your next Mathematics Advanced lesson?</h2>
             <p class="hero__lead">
               Find teacher-uploaded mini apps, homework, classroom worksheets, practice questions and revision papers —
-              all organised around your year level and topic.
+              all organised around your year level and topic. Register and log in to download: your files are waiting
+              on your own <b>My learning</b> page.
             </p>
             <p class="hero__quote">Everything you need to revise, practise and succeed — in one place.</p>
 
@@ -811,12 +812,15 @@ table.data th.num{text-align:right}
         </div>
       </section>
 
+      <!-- Download policy: rendered for visitors and signed-in students -->
+      <section class="panel panel--pad mb-6" id="download-policy" hidden aria-label="How downloads work"></section>
+
       <!-- Library catalogue -->
       <div class="section-head">
         <div>
           <p class="eyebrow">Mathematics Advanced library</p>
           <h2>Explore your learning library</h2>
-          <p>Search by topic, year level or resource type. Every file is ready to preview or download.</p>
+          <p>Search by topic, year level or resource type. Previews are open to everyone; downloading a file needs a student account and happens on your <b>My learning</b> page.</p>
         </div>
         <button type="button" class="btn btn--outline" data-action="browse-latest">
           <svg class="ico ico--sm" aria-hidden="true"><use href="#i-clock"/></svg> Latest additions
@@ -1013,12 +1017,14 @@ table.data th.num{text-align:right}
 
       <div class="kpi-grid mb-6" id="ml-kpis"></div>
 
+      <div class="notice notice--ok mb-6" id="ml-download-note" role="status"></div>
+
       <div class="split">
         <section class="panel" aria-labelledby="ml-for-you">
           <div class="panel__head">
             <div>
-              <h3 id="ml-for-you">Recommended for your year level</h3>
-              <p>Teacher resources matched to the year level you registered with.</p>
+              <h3 id="ml-for-you">Download your year-level files</h3>
+              <p>This is your download page. Every file you take here is recorded for your teacher.</p>
             </div>
             <button type="button" class="btn btn--subtle btn--sm" data-action="filter-my-year">
               <svg class="ico ico--sm" aria-hidden="true"><use href="#i-target"/></svg> Open in library
@@ -1041,15 +1047,28 @@ table.data th.num{text-align:right}
             <div class="table-wrap">
               <table class="data">
                 <thead>
-                  <tr><th scope="col">File</th><th scope="col">Type</th><th scope="col">When</th></tr>
+                  <tr><th scope="col">File</th><th scope="col">Type</th><th scope="col" class="num">Times</th><th scope="col">Last download</th></tr>
                 </thead>
                 <tbody id="ml-history-body"></tbody>
               </table>
             </div>
-            <p class="text-sm muted mt-3" id="ml-history-empty">You have not downloaded anything yet.</p>
+            <p class="text-sm muted mt-3" id="ml-history-empty">You have not downloaded anything yet — download a file above and it will be listed here.</p>
           </div>
         </section>
       </div>
+
+      <section class="panel mb-6" aria-labelledby="ml-all-heading">
+        <div class="panel__head">
+          <div>
+            <h3 id="ml-all-heading">Other resources you can download</h3>
+            <p>Everything else on the subject cloud, including other year levels. Downloads still count for your account.</p>
+          </div>
+        </div>
+        <div class="panel__body">
+          <ul class="catalog-grid" id="ml-all" role="list"></ul>
+          <p class="text-sm muted mt-3" id="ml-all-foot"></p>
+        </div>
+      </section>
     </div>
 
     <!-- =====================================================================
@@ -1132,9 +1151,12 @@ table.data th.num{text-align:right}
         <div class="panel__head">
           <div>
             <h3 id="students-heading">Student register &amp; monitoring</h3>
-            <p>Live shared register: names, issued credentials, year levels, visits and downloads. It refreshes when the admin dashboard opens, returns to focus, or you choose “Refresh live data”.</p>
+            <p>Live shared register: names, issued credentials, year levels, visits and downloads. Each student's downloads are counted in their own <b>Abacus counter</b>, and every file they took is listed in their profile. It refreshes when the admin dashboard opens, returns to focus, or you choose “Refresh live data”.</p>
           </div>
           <div class="toolbar-inline">
+            <button type="button" class="btn btn--subtle btn--sm" data-action="refresh-student-counters" title="Read each student's download counter from Abacus">
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-refresh"/></svg> Abacus counters
+            </button>
             <button type="button" class="btn btn--subtle btn--sm" data-action="toggle-passwords">
               <svg class="ico ico--sm" aria-hidden="true"><use href="#i-eye"/></svg> <span id="pw-toggle-label">Hide passwords</span>
             </button>
@@ -1183,7 +1205,7 @@ table.data th.num{text-align:right}
                   <th scope="col">Registered</th>
                   <th scope="col">Last visit</th>
                   <th scope="col" class="num">Visits</th>
-                  <th scope="col" class="num">Downloads</th>
+                  <th scope="col" class="num" title="Downloads recorded for this student, with their own Abacus counter underneath when it has been read">Downloads <span class="hint">· Abacus</span></th>
                   <th scope="col">Status</th>
                   <th scope="col">Actions</th>
                 </tr>
@@ -1197,6 +1219,7 @@ table.data th.num{text-align:right}
         <div class="panel__foot">
           <div class="row row--wrap">
             <span class="tag tag--slate">Select a row action to open a full student profile, reset a password, block access or remove the record.</span>
+            <span class="tag tag--indigo" id="student-abacus-note">Abacus per-student counters load on demand.</span>
           </div>
         </div>
       </section>
@@ -1692,7 +1715,8 @@ table.data th.num{text-align:right}
             <label class="switch"><input type="checkbox" id="opt-push-analytics"><span class="switch__track"></span> Push this browser's student records and counters to GitHub after changes</label>
             <div class="notice notice--warn"><div><b>Privacy warning:</b> the current repository is public. When this mirror is on, <code>cloud-data.json</code> includes student names, usernames and activity counts — never passwords, which stay in the shared backend. Anyone online can read the names; switch it off to publish counters only.</div></div>
             <label class="switch"><input type="checkbox" id="opt-open-registration"><span class="switch__track"></span> Allow students to register themselves</label>
-            <label class="switch"><input type="checkbox" id="opt-require-login"><span class="switch__track"></span> Only signed-in students may download files</label>
+            <label class="switch"><input type="checkbox" id="opt-require-login" checked disabled><span class="switch__track"></span> Downloads always need a registered student account, on their My learning page</label>
+            <p class="hint">Fixed in this version: an unregistered visitor is told to register and log in before downloading, and a signed-in student downloads from their own <b>My learning</b> page so every download is counted per student in Abacus and listed in the register. Teachers can still download from the library.</p>
             <label class="switch"><input type="checkbox" id="opt-blocked-copy"><span class="switch__track"></span> Show a "blocked" message to students whose access the admin removed</label>
             <div class="field-row">
               <div class="field">
@@ -1836,7 +1860,7 @@ table.data th.num{text-align:right}
 'use strict';
 
 /* ---------------------------- 1. Configuration --------------------------- */
-var APP_VERSION   = 'v2.2.0';
+var APP_VERSION   = 'v2.3.0';
 var SUBJECT       = 'Mathematics Advanced';
 var DEFAULT_ADMIN = { user: 'peter82', pass: 'petgabs82' };
 var DEFAULT_YEARS = ['Year 9', 'Year 10', 'Year 11', 'Year 12'];
@@ -1915,7 +1939,9 @@ var DEFAULT_SETTINGS = {
   syncEnabled: true,
   syncRosterInRepo: true,
   openRegistration: true,
-  requireLogin: false,
+  // Downloads always require a signed-in student on their own My learning page.
+  // Older devices may hold the retired opt-out flag; it is ignored on load.
+  requireLogin: true,
   showBlockedMessage: true,
   defaultOwner: '',
   department: 'Mathematics',
@@ -1990,8 +2016,11 @@ var state = {
           lastSync: null, rosterAt: null, rosterLoading: false, rosterPromise: null,
           error: '', pending: 0, flushing: false, fromRepo: false },
   abacus: { status: 'checking', lastSync: null, error: '', pending: 0, loading: null, flushing: false,
-            initialized: { visits: false, downloads: false, files: {} }, inFlight: { visits: 0, downloads: 0, files: {} },
-            fileTotals: {}, fileLoads: {}, fileFetchedAt: {} },
+            initialized: { visits: false, downloads: false, files: {}, students: {}, studentFiles: {} },
+            inFlight: { visits: 0, downloads: 0, files: {}, students: {}, studentFiles: {} },
+            fileTotals: {}, fileLoads: {}, fileFetchedAt: {},
+            studentTotals: {}, studentFiles: {}, studentLoading: {}, studentFileLoading: {},
+            studentFetchedAt: {}, studentAutoLoad: {}, studentRefresh: null, studentScan: null },
   filters: { query: '', year: '', topic: '', category: '', kind: '', sort: 'newest' },
   studentsFilter: { query: '', year: '', status: '', sort: 'recent' },
   filesFilter: { year: '', category: '' },
@@ -2004,6 +2033,9 @@ var state = {
   busy: false,
   transport: 'device'   // 'cloud' when the repository is reachable
 };
+// The download policy is fixed: a visitor must register/sign in as a student and
+// download from their own My learning page. An old saved setting cannot relax it.
+state.settings.requireLogin = true;
 
 function saveSettings() { store.set(KEYS.settings, state.settings); }
 function saveStudents() { store.set(KEYS.students, state.students); }
@@ -2220,6 +2252,76 @@ function currentAdmin() { return state.session && state.session.role === 'admin'
 function isTeacher() { return currentAdmin() || (state.session && state.session.role === 'teacher'); }
 function canUpload() { return currentAdmin(); }
 
+/* Download access policy -------------------------------------------------
+   A visitor who is not registered and signed in cannot download or open a
+   file. A signed-in student downloads from their own "My learning" page, so
+   the register, the download history and the Abacus per-student counter all
+   agree. Teachers keep full access so they can check a file themselves. */
+function downloadAccess(item) {
+  if (currentAdmin() || isTeacher()) return { ok: true, admin: true, student: null };
+  if (item && item.visible === false) return { ok: false, reason: 'hidden', student: null };
+  var student = currentStudent();
+  if (!student) return { ok: false, reason: 'guest', student: null };
+  if (student.status === 'blocked') return { ok: false, reason: 'blocked', student: student };
+  if (state.view !== 'my-learning') return { ok: false, reason: 'page', student: student };
+  return { ok: true, admin: false, student: student };
+}
+function downloadGateLabel(item) {
+  return item ? ('“' + (item.title || item.fileName || 'This resource') + '”') : 'Files and resources';
+}
+function openDownloadGate(access, item) {
+  var student = access ? access.student : null;
+  var label = downloadGateLabel(item);
+  if (!access || access.reason === 'guest') {
+    openModal({
+      name: 'download-gate', icon: 'lock', badge: 'amber',
+      title: 'Register first, then download',
+      subtitle: label + ' is locked until you have a student account.',
+      size: 'sm',
+      body: '<p class="text-sm">You need to <b>register and log in to your own account before you can download</b> files and resources. Registering takes one step — your first name and year level — and the site issues your username and password immediately.</p>' +
+        '<ol class="text-sm muted mt-3" style="list-style:decimal;padding-left:1.2rem;display:grid;gap:.35rem">' +
+          '<li>Press <b>Register now</b> and enter your first name and year level.</li>' +
+          '<li>Write down or copy the username and password the site gives you.</li>' +
+          '<li>Log in, then open <b>My learning</b> — that is where your year-level files can be downloaded.</li>' +
+        '</ol>' +
+        '<div class="notice notice--info mt-3"><div>Every download is recorded for your teacher with your name, the file and the time. Already registered? Choose <b>I already have an account</b> to log in.</div></div>',
+      actions: [
+        { label: 'Register now', action: 'gate-register', variant: 'btn--emerald', icon: 'user-plus' },
+        { label: 'I already have an account', action: 'gate-login', variant: 'btn--outline', icon: 'log-in' }
+      ]
+    });
+    toast('Register and log in to download files.', 'warn');
+    return;
+  }
+  if (access.reason === 'page') {
+    openModal({
+      name: 'download-gate', icon: 'book', badge: 'indigo',
+      title: 'Download from My learning',
+      subtitle: student ? ('Signed in as ' + student.firstName + ' · ' + student.year) : 'Signed in',
+      size: 'sm',
+      body: '<p class="text-sm">You are signed in, so ' + label + ' is ready for you. Downloads are recorded per student, so they happen on your own <b>My learning</b> page — together with the rest of the files for your year level.</p>' +
+        '<div class="notice notice--info mt-3"><div>Your download history stays up to date and the Abacus counter for your account goes up when you download from that page.</div></div>',
+      actions: [
+        { label: 'Go to My learning and download', action: 'gate-my-learning', id: item ? item.id : '', variant: 'btn--primary', icon: 'book' },
+        { label: 'Not now', action: 'modal-close', variant: 'btn--outline' }
+      ]
+    });
+    return;
+  }
+  if (access.reason === 'blocked') {
+    openModal({
+      name: 'download-gate', icon: 'ban', badge: 'rose',
+      title: 'Downloads are switched off',
+      subtitle: student ? (student.firstName + ' · ' + student.year) : 'This account',
+      size: 'sm',
+      body: '<p class="text-sm">This account cannot download at the moment. Please speak to your teacher about your access.</p>',
+      actions: [{ label: 'Close', action: 'modal-close', variant: 'btn--outline' }]
+    });
+    return;
+  }
+  toast('This file is not available for download.', 'warn');
+}
+
 /* Shared site counters use Abacus, a public integer-counter API. The namespace
    is deliberately stable for this site; resource paths are hashed into short,
    URL-safe keys so filenames and student data are never sent to Abacus. */
@@ -2231,19 +2333,48 @@ var ABACUS_REFRESH_MS = 60 * 1000;
 var ABACUS_FILE_REFRESH_MS = 5 * 60 * 1000;
 var ABACUS_FILE_LOOKUP_GAP_MS = 450;
 var ABACUS_QUEUE_MAX = 200;
+// How many per-student counters one "refresh counters" press may read.
+var ABACUS_STUDENT_SCAN_MAX = 60;
 
-function abacusResourceCounterKey(itemOrStableKey) {
-  var stableKey = typeof itemOrStableKey === 'string' ? itemOrStableKey : counterResourceKey(itemOrStableKey);
-  if (!stableKey) return '';
+function abacusHashKey(seed) {
+  var text = String(seed || '');
   var h1 = 2166136261, h2 = 0x9e3779b9;
-  for (var i = 0; i < stableKey.length; i++) {
-    var code = stableKey.charCodeAt(i);
+  for (var i = 0; i < text.length; i++) {
+    var code = text.charCodeAt(i);
     h1 = Math.imul(h1 ^ code, 16777619);
     h2 = Math.imul(h2 ^ code, 2246822519);
     h2 ^= h2 >>> 13;
   }
   function hex32(value) { return ('00000000' + (value >>> 0).toString(16)).slice(-8); }
-  return 'file-' + hex32(h1) + hex32(h2);
+  return hex32(h1) + hex32(h2);
+}
+function abacusResourceCounterKey(itemOrStableKey) {
+  var stableKey = typeof itemOrStableKey === 'string' ? itemOrStableKey : counterResourceKey(itemOrStableKey);
+  if (!stableKey) return '';
+  return 'file-' + abacusHashKey(stableKey);
+}
+// One Abacus counter per student (keyed from the shared username so every
+// device reads the same counter) and one per student-and-file pair. Abacus
+// only ever sees the hashed keys, never names or file names.
+function abacusStudentCounterKey(studentOrUsername) {
+  var username = typeof studentOrUsername === 'string'
+    ? studentOrUsername
+    : (studentOrUsername && studentOrUsername.username) || '';
+  var slug = String(username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!slug) {
+    var id = (typeof studentOrUsername === 'string' ? '' : (studentOrUsername && studentOrUsername.id)) || '';
+    if (!id) return '';
+    return 'stu-' + abacusHashKey('id:' + id);
+  }
+  return 'stu-' + abacusHashKey('username:' + slug);
+}
+function abacusStudentFileCounterKeyForResourceKey(student, resourceKey) {
+  var studentKey = abacusStudentCounterKey(student);
+  if (!studentKey || !resourceKey) return '';
+  return 'stuf-' + abacusHashKey(studentKey + '|' + resourceKey);
+}
+function abacusStudentFileCounterKey(student, item) {
+  return abacusStudentFileCounterKeyForResourceKey(student, counterResourceKey(item));
 }
 function abacusRequest(action, key) {
   key = String(key || '');
@@ -2345,6 +2476,147 @@ function applyAbacusFileTotal(item, key, value, exact) {
     saveResources();
   }
 }
+// Per-student counters: "how many downloads has this student made?" and
+// "how many times has this student taken this exact file?".
+function applyAbacusStudentTotal(key, value, exact) {
+  if (!key) return 0;
+  var initialized = !!state.abacus.initialized.students[key];
+  var current = Number(state.abacus.studentTotals[key]) || 0;
+  var inFlight = Number(state.abacus.inFlight.students[key]) || 0;
+  var authoritative = value + abacusQueuedCount('student', key);
+  state.abacus.studentTotals[key] = !initialized || (exact && !inFlight) ? authoritative : Math.max(current, authoritative);
+  state.abacus.initialized.students[key] = true;
+  state.abacus.studentFetchedAt[key] = Date.now();
+  return state.abacus.studentTotals[key];
+}
+function applyAbacusStudentFileTotal(key, value, exact) {
+  if (!key) return 0;
+  var initialized = !!state.abacus.initialized.studentFiles[key];
+  var current = Number(state.abacus.studentFiles[key]) || 0;
+  var inFlight = Number(state.abacus.inFlight.studentFiles[key]) || 0;
+  var authoritative = value + abacusQueuedCount('studentfile', key);
+  state.abacus.studentFiles[key] = !initialized || (exact && !inFlight) ? authoritative : Math.max(current, authoritative);
+  state.abacus.initialized.studentFiles[key] = true;
+  return state.abacus.studentFiles[key];
+}
+function abacusStudentTotal(student) {
+  var key = abacusStudentCounterKey(student);
+  if (!key) return null;
+  var value = state.abacus.studentTotals[key];
+  return typeof value === 'number' ? value : null;
+}
+function loadAbacusStudentTotalByKey(key, force) {
+  if (!key) return Promise.resolve(null);
+  if (!force && typeof state.abacus.studentTotals[key] === 'number' && state.abacus.studentFetchedAt[key] &&
+      Date.now() - state.abacus.studentFetchedAt[key] < ABACUS_REFRESH_MS) {
+    return Promise.resolve(state.abacus.studentTotals[key]);
+  }
+  if (state.abacus.studentLoading[key]) return state.abacus.studentLoading[key];
+  if (navigator.onLine === false) return Promise.resolve(null);
+  var request = abacusRequest('get', key).then(function (value) {
+    applyAbacusStudentTotal(key, value, true);
+    abacusMarkConnected();
+    return state.abacus.studentTotals[key];
+  }, function (err) {
+    abacusSetError(err, true);
+    return null;
+  }).then(function (value) {
+    state.abacus.studentLoading[key] = null;
+    return value;
+  });
+  state.abacus.studentLoading[key] = request;
+  return request;
+}
+function loadAbacusStudentTotal(student, force) {
+  return loadAbacusStudentTotalByKey(abacusStudentCounterKey(student), force);
+}
+function loadAbacusStudentFileTotalByKey(key, force) {
+  if (!key) return Promise.resolve(null);
+  if (!force && typeof state.abacus.studentFiles[key] === 'number') return Promise.resolve(state.abacus.studentFiles[key]);
+  if (state.abacus.studentFileLoading[key]) return state.abacus.studentFileLoading[key];
+  if (navigator.onLine === false) return Promise.resolve(null);
+  var request = abacusRequest('get', key).then(function (value) {
+    applyAbacusStudentFileTotal(key, value, true);
+    abacusMarkConnected();
+    return state.abacus.studentFiles[key];
+  }, function (err) {
+    abacusSetError(err, true);
+    return null;
+  }).then(function (value) {
+    state.abacus.studentFileLoading[key] = null;
+    return value;
+  });
+  state.abacus.studentFileLoading[key] = request;
+  return request;
+}
+function loadAbacusStudentFileTotal(student, item, force) {
+  return loadAbacusStudentFileTotalByKey(abacusStudentFileCounterKey(student, item), force);
+}
+// The Abacus resource key behind one grouped history row (used by the student
+// profile, where an old file may no longer be in the library).
+function studentHistoryResourceKey(group) {
+  if (!group) return '';
+  if (group.resourceKey) return group.resourceKey;
+  var item = group.resourceId ? findResource(group.resourceId) : null;
+  if (item) return counterResourceKey(item);
+  if (group.resourceId) return 'id:' + group.resourceId;
+  return group.fileName ? 'file:' + group.fileName : '';
+}
+function abacusStudentFileTotalByResourceKey(student, resourceKey) {
+  var key = abacusStudentFileCounterKeyForResourceKey(student, resourceKey);
+  if (!key) return null;
+  var value = state.abacus.studentFiles[key];
+  return typeof value === 'number' ? value : null;
+}
+// Reads the Abacus download counter for a list of students, one at a time so
+// the public counter API is not hammered. Used by the register panel button.
+function refreshAbacusStudentTotals(list, silent) {
+  list = (list || []).filter(function (s) { return s && abacusStudentCounterKey(s); });
+  if (!list.length) {
+    if (!silent) toast('No registered students to read counters for yet.', 'info');
+    return Promise.resolve(0);
+  }
+  if (state.abacus.studentRefresh) return state.abacus.studentRefresh;
+  if (navigator.onLine === false) {
+    if (!silent) toast('The browser is offline, so Abacus counters cannot be read right now.', 'warn');
+    return Promise.resolve(0);
+  }
+  var queue = list.slice(0, ABACUS_STUDENT_SCAN_MAX);
+  var read = 0, attempted = 0;
+  state.abacus.studentScan = { done: 0, total: queue.length, running: true };
+  function next() {
+    if (!queue.length || navigator.onLine === false) return Promise.resolve(read);
+    var wait = attempted ? new Promise(function (resolve) { setTimeout(resolve, ABACUS_HIT_GAP_MS); }) : Promise.resolve();
+    return wait.then(function () {
+      var student = queue.shift();
+      attempted++;
+      return loadAbacusStudentTotal(student, true).then(function (value) {
+        if (value !== null) read++;
+        state.abacus.studentScan.done = attempted;
+        renderCounterViews();
+        return next();
+      });
+    });
+  }
+  state.abacus.studentRefresh = next().then(function (count) {
+    state.abacus.studentRefresh = null;
+    state.abacus.studentScan = { done: attempted, total: attempted, running: false };
+    if (!silent) {
+      toast(count
+        ? 'Abacus download counters read for ' + count + ' student' + (count === 1 ? '' : 's') +
+          (list.length > attempted ? ' (first ' + attempted + ' of ' + list.length + ' — press again for the rest)' : '') + '.'
+        : 'No Abacus student counter could be read — check the connection and try again.', count ? 'success' : 'warn');
+    }
+    renderCounterViews();
+    return count;
+  }, function () {
+    state.abacus.studentRefresh = null;
+    state.abacus.studentScan = { done: attempted, total: attempted, running: false };
+    renderCounterViews();
+    return 0;
+  });
+  return state.abacus.studentRefresh;
+}
 function loadAbacusTotals(force) {
   if (state.abacus.loading) return state.abacus.loading;
   if (navigator.onLine === false) {
@@ -2376,6 +2648,10 @@ function loadAbacusTotals(force) {
 function changeAbacusInFlight(key, kind, delta) {
   if (kind === 'file') {
     state.abacus.inFlight.files[key] = Math.max(0, (state.abacus.inFlight.files[key] || 0) + delta);
+  } else if (kind === 'student') {
+    state.abacus.inFlight.students[key] = Math.max(0, (state.abacus.inFlight.students[key] || 0) + delta);
+  } else if (kind === 'studentfile') {
+    state.abacus.inFlight.studentFiles[key] = Math.max(0, (state.abacus.inFlight.studentFiles[key] || 0) + delta);
   } else {
     state.abacus.inFlight[kind] = Math.max(0, (state.abacus.inFlight[kind] || 0) + delta);
   }
@@ -2384,6 +2660,10 @@ function applyAbacusHit(key, kind, value) {
   if (kind === 'file') {
     applyAbacusFileTotal(null, key, value);
     state.abacus.fileFetchedAt[key] = Date.now();
+  } else if (kind === 'student') {
+    applyAbacusStudentTotal(key, value);
+  } else if (kind === 'studentfile') {
+    applyAbacusStudentFileTotal(key, value);
   } else applyAbacusTotal(kind, value);
   abacusMarkConnected();
   renderCounterViews();
@@ -2411,13 +2691,20 @@ function abacusIncrementCounter(key, kind) {
 function countAbacusVisit() {
   return abacusIncrementCounter('visits', 'visits');
 }
-function countAbacusDownload(item) {
+function countAbacusDownload(item, student) {
   var stableKey = counterResourceKey(item);
   if (!stableKey) return Promise.resolve(null); // device-only or unkeyable files stay local
-  return Promise.all([
+  var jobs = [
     abacusIncrementCounter('downloads', 'downloads'),
     abacusIncrementCounter(abacusResourceCounterKey(stableKey), 'file')
-  ]);
+  ];
+  // The teacher's dashboard reads these two counters per student, so the
+  // register can show who downloaded what straight from Abacus.
+  var studentKey = student ? abacusStudentCounterKey(student) : '';
+  if (studentKey) jobs.push(abacusIncrementCounter(studentKey, 'student'));
+  var studentFileKey = student ? abacusStudentFileCounterKey(student, item) : '';
+  if (studentFileKey) jobs.push(abacusIncrementCounter(studentFileKey, 'studentfile'));
+  return Promise.all(jobs);
 }
 function abacusFlushQueue() {
   if (state.abacus.flushing || navigator.onLine === false) return Promise.resolve(0);
@@ -2597,9 +2884,14 @@ function recordDownload(item, student) {
   item.lastDownloadAt = at;
   if (student) {
     if (!Array.isArray(student.downloads)) student.downloads = [];
-    student.downloads.unshift({ at: at, resourceId: item.id, title: item.title, fileName: item.fileName, category: item.category });
+    student.downloads.unshift({
+      at: at, resourceId: item.id, resourceKey: counterResourceKey(item),
+      title: item.title, fileName: item.fileName,
+      category: item.category, topic: item.topic, year: item.year
+    });
     if (student.downloads.length > 200) student.downloads = student.downloads.slice(0, 200);
     student.downloadCount = (student.downloadCount || 0) + 1;
+    student.lastDownloadAt = at;
     student.lastVisit = at;
     saveStudents();
   }
@@ -2607,7 +2899,7 @@ function recordDownload(item, student) {
   saveResources();
   saveCounters();
   maybePushAnalytics();
-  return countAbacusDownload(item);
+  return countAbacusDownload(item, student);
 }
 
 /* ------------------------------ 5. Students ------------------------------- */
@@ -2768,6 +3060,63 @@ function findStudent(id) {
 }
 function studentDownloads(student) {
   return (student && Array.isArray(student.downloads)) ? student.downloads : [];
+}
+// Everything one student has downloaded: their own record plus any matching
+// shared download-log entries (the admin's live roster merges the log in).
+function studentDownloadHistory(student) {
+  if (!student) return [];
+  var merged = [], seen = {};
+  function keyOf(entry) {
+    return (entry.at || '') + '|' + (entry.resourceKey || entry.resourceId || entry.title || entry.fileName || '');
+  }
+  function add(entry) {
+    if (!entry || (!entry.at && !entry.title && !entry.fileName)) return;
+    var key = keyOf(entry);
+    if (seen[key]) return;
+    seen[key] = true;
+    merged.push(entry);
+  }
+  studentDownloads(student).forEach(add);
+  (state.logs.downloads || []).forEach(function (entry) {
+    if (!entry || !entry.at) return;
+    if (entry.studentId) {
+      if (entry.studentId === student.id || (student.cloudId && entry.studentId === student.cloudId)) add(entry);
+      return;
+    }
+    // Legacy entries recorded before student ids were stored: match name + year.
+    if (entry.studentName && student.firstName && entry.studentName === student.firstName &&
+        String(entry.studentYear || '') === String(student.year || '')) add(entry);
+  });
+  merged.sort(function (a, b) { return new Date(b.at || 0) - new Date(a.at || 0); });
+  return merged;
+}
+// Groups a download history into one row per file: how many times and when last.
+function summarizeDownloads(history) {
+  var groups = {}, order = [];
+  (history || []).forEach(function (entry) {
+    var key = entry.resourceKey || entry.resourceId || (entry.title || entry.fileName || '');
+    if (!groups[key]) {
+      groups[key] = {
+        key: key,
+        resourceKey: entry.resourceKey || '',
+        resourceId: entry.resourceId || '',
+        title: entry.title || baseName(entry.fileName || '') || 'Untitled resource',
+        fileName: entry.fileName || '',
+        category: entry.category || 'File',
+        topic: entry.topic || '',
+        year: entry.year || '',
+        count: 0,
+        lastAt: entry.at || ''
+      };
+      order.push(key);
+    }
+    var group = groups[key];
+    group.count++;
+    if (new Date(entry.at || 0) > new Date(group.lastAt || 0)) group.lastAt = entry.at || group.lastAt;
+    if (!group.category && entry.category) group.category = entry.category;
+    if (!group.topic && entry.topic) group.topic = entry.topic;
+  });
+  return order.map(function (key) { return groups[key]; });
 }
 
 /* --------------------------- 6. Library & filters ------------------------- */
@@ -4185,6 +4534,41 @@ function renderStudentStrip() {
 }
 
 /* ------------------------------- Library -------------------------------- */
+// The library is browsable by anyone, but downloads are reserved for signed-in
+// students. This panel says so, and changes once the student is signed in.
+function renderDownloadPolicy() {
+  var panel = $('#download-policy');
+  if (!panel) return;
+  var student = currentStudent();
+  if (currentAdmin()) { panel.hidden = true; panel.innerHTML = ''; return; }
+  panel.hidden = false;
+  if (student) {
+    panel.innerHTML = '<div class="row row--between row--wrap">' +
+        '<div class="row row--wrap">' +
+          '<span class="tag tag--emerald">' + svgIcon('check-circle', 'ico--sm') + ' Signed in as ' + esc(student.firstName) + ' · ' + esc(student.year) + '</span>' +
+          '<div>' +
+            '<p class="block-title text-sm">Downloads are open on your own My learning page</p>' +
+            '<p class="text-sm muted">Every file you take there is recorded for your teacher: your name, the file and the time, plus your own Abacus download counter.</p>' +
+          '</div>' +
+        '</div>' +
+        '<button type="button" class="btn btn--primary btn--sm" data-action="go-my-learning">' + svgIcon('book', 'ico--sm') + ' My learning</button>' +
+      '</div>';
+    return;
+  }
+  panel.innerHTML = '<div class="row row--between row--wrap">' +
+      '<div class="row row--wrap">' +
+        '<span class="tag tag--amber">' + svgIcon('lock', 'ico--sm') + ' Account required to download</span>' +
+        '<div>' +
+          '<p class="block-title text-sm">Register and log in before you download files and resources</p>' +
+          '<p class="text-sm muted">Anyone can browse and preview the library. To download — or open a mini app — you need a student account: register with your first name and year level, then take your files from <b>My learning</b>. Each download is recorded in the student register for your teacher.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="row row--wrap">' +
+        '<button type="button" class="btn btn--emerald btn--sm" data-action="open-register">' + svgIcon('user-plus', 'ico--sm') + ' Register</button>' +
+        '<button type="button" class="btn btn--outline btn--sm" data-action="open-student-auth">' + svgIcon('log-in', 'ico--sm') + ' Log in</button>' +
+      '</div>' +
+    '</div>';
+}
 function renderLibrary() {
   var f = state.filters;
   var fc = facets();
@@ -4273,6 +4657,8 @@ function renderLibrary() {
     badge.textContent = n;
   }
 
+  renderDownloadPolicy();
+
   // States
   var loading = $('#loading-skeletons');
   if (loading) loading.hidden = !(state.cloud.loading && state.resources.length === 0);
@@ -4326,6 +4712,8 @@ function cardHtml(item) {
   var fresh = freshness(item);
   var canOpen = (item.ext === 'html' || item.ext === 'htm');
   var admin = currentAdmin();
+  var student = currentStudent();
+  var guest = !admin && !student;
   var urls = resourceUrls(item);
   var buttons = [];
   if (canPreview(item)) {
@@ -4336,8 +4724,10 @@ function cardHtml(item) {
     buttons.push('<button type="button" class="btn btn--outline btn--sm" data-action="open-app" data-id="' + attr(item.id) + '">' +
       svgIcon('external', 'ico--sm') + 'Open</button>');
   }
-  buttons.push('<button type="button" class="btn btn--dark btn--sm" data-action="download" data-id="' + attr(item.id) + '">' +
-    svgIcon('download', 'ico--sm') + 'Download</button>');
+  buttons.push('<button type="button" class="btn btn--dark btn--sm" data-action="download" data-id="' + attr(item.id) + '"' +
+    (guest ? ' title="Create a student account and log in to download this file"' : (student ? ' title="Downloads are recorded on your My learning page"' : '')) + '>' +
+    svgIcon(guest ? 'lock' : 'download', 'ico--sm') +
+    (admin ? 'Download' : (guest ? 'Sign in to download' : 'Download in My learning')) + '</button>');
   if (admin) {
     if (urls.raw) {
       buttons.push('<button type="button" class="btn btn--ghost btn--icon" title="Copy the download link" aria-label="Copy the download link" data-action="copy-link" data-id="' + attr(item.id) + '">' + svgIcon('link', 'ico--sm') + '</button>');
@@ -4363,6 +4753,7 @@ function cardHtml(item) {
           (item.topic ? '<span class="tag tag--slate">' + svgIcon('sigma', 'ico--sm') + ' ' + esc(item.topic) + '</span>' : '') +
           '<span class="tag ' + categoryTagClass(item.category) + '">' + esc(item.category) + '</span>' +
           '<span class="tag ' + fresh.cls + '">' + svgIcon(fresh.icon, 'ico--sm') + ' ' + esc(fresh.label) + '</span>' +
+          (guest ? '<span class="tag tag--amber">' + svgIcon('lock', 'ico--sm') + ' Account required</span>' : '') +
           (item.source === 'device' ? '<span class="tag tag--amber">This device only</span>' : '') +
         '</div>' +
         '<p class="rcard__desc">' + (item.description ? esc(item.description) : '<span class="muted-2">No description provided.</span>') + '</p>' +
@@ -4400,9 +4791,13 @@ function renderMyLearning() {
   var newThisWeek = state.resources.filter(function (r) {
     return r.visible !== false && (Date.now() - new Date(r.addedAt || 0).getTime()) < 7 * 24 * 60 * 60 * 1000;
   }).length;
+  var history = studentDownloadHistory(student);
+  var abacusValue = abacusStudentTotal(student);
+  maybeLoadStudentAbacusTotal(student, abacusValue);
   kpis.innerHTML = [
     kpiHtml('My visits', formatCount(student.visitCount || 0), 'Signed in ' + (student.lastVisit ? relativeTime(student.lastVisit) : 'just now'), 'activity', 'kpi--indigo'),
-    kpiHtml('My downloads', formatCount(student.downloadCount || 0), (student.downloads[0] ? 'Last: ' + student.downloads[0].title : 'Nothing yet'), 'cloud-download', 'kpi--emerald'),
+    kpiHtml('My downloads', formatCount(student.downloadCount || 0), (history[0] ? 'Last: ' + (history[0].title || history[0].fileName) : 'Nothing yet'), 'download', 'kpi--emerald'),
+    kpiHtml('My Abacus counter', abacusValue === null ? '—' : formatCount(abacusValue), abacusValue === null ? 'Shared counter for your account' : 'Every download by your account', 'cloud-download', 'kpi--indigo'),
     kpiHtml('For ' + student.year, formatCount(forYear.length), 'Resources matched to your year', 'target', 'kpi--amber'),
     kpiHtml('New this week', formatCount(newThisWeek), 'Across all year levels', 'sparkles', '')
   ].join('');
@@ -4426,17 +4821,55 @@ function renderMyLearning() {
   var foot = $('#ml-recommended-foot');
   if (foot) foot.textContent = forYear.length > 6 ? ('Showing 6 of ' + forYear.length + ' resources for ' + student.year + '.') : (forYear.length ? 'Showing all resources for ' + student.year + '.' : 'Your teacher has not uploaded anything for ' + student.year + ' yet.');
 
+  var other = state.resources.filter(function (r) { return r.visible !== false && r.year !== student.year; });
+  var otherList = $('#ml-all');
+  if (otherList) {
+    otherList.innerHTML = other.slice(0, 12).map(function (item) {
+      return '<li class="preview-card"><p class="text-sm" style="font-weight:700">' + esc(item.title) + '</p>' +
+        '<p class="hint mb-2">' + esc(item.year) + ' · ' + esc(item.category) + (item.topic ? ' · ' + esc(item.topic) : '') + '</p>' +
+        '<div class="row row--wrap">' +
+        '<button type="button" class="btn btn--outline btn--sm" data-action="preview" data-id="' + attr(item.id) + '">Preview</button>' +
+        '<button type="button" class="btn btn--dark btn--sm" data-action="download" data-id="' + attr(item.id) + '">Download</button>' +
+        '</div></li>';
+    }).join('');
+  }
+  var otherFoot = $('#ml-all-foot');
+  if (otherFoot) {
+    otherFoot.textContent = other.length
+      ? (other.length > 12 ? 'Showing 12 of ' + other.length + ' resources from other year levels.' : 'Showing all ' + other.length + ' remaining resource' + (other.length === 1 ? '' : 's') + '.')
+      : 'There are no other resources on the cloud right now.';
+  }
+
+  var note = $('#ml-download-note');
+  if (note) {
+    note.innerHTML = '<div><b>This is your download page.</b> Files you download here are recorded for your teacher with your name, the file and the time' +
+      (abacusValue === null ? '.' : ' — your Abacus download counter is at <b>' + formatCount(abacusValue) + '</b>.') +
+      ' Downloading anywhere else is locked, so always come back to My learning.</div>';
+  }
+
   var body = $('#ml-history-body');
   if (body) {
-    var history = studentDownloads(student).slice(0, 30);
-    body.innerHTML = history.map(function (d) {
-      return '<tr><td class="wrap-cell"><b>' + esc(d.title || baseName(d.fileName || '')) + '</b><p class="hint">' + esc(d.fileName || '') + '</p></td>' +
-        '<td><span class="tag tag--slate">' + esc(d.category || 'File') + '</span></td>' +
-        '<td>' + esc(formatDateTime(d.at)) + '<p class="hint">' + esc(relativeTime(d.at)) + '</p></td></tr>';
+    var groups = summarizeDownloads(history).slice(0, 30);
+    body.innerHTML = groups.map(function (g) {
+      return '<tr><td class="wrap-cell"><b>' + esc(g.title) + '</b><p class="hint">' + esc(g.fileName || '') + '</p></td>' +
+        '<td><span class="tag tag--slate">' + esc(g.category || 'File') + '</span>' + (g.topic ? '<p class="hint">' + esc(g.topic) + '</p>' : '') + '</td>' +
+        '<td class="num">' + formatCount(g.count) + '</td>' +
+        '<td>' + esc(formatDateTime(g.lastAt)) + '<p class="hint">' + esc(relativeTime(g.lastAt)) + '</p></td></tr>';
     }).join('');
   }
   var empty = $('#ml-history-empty');
-  if (empty) empty.hidden = studentDownloads(student).length > 0;
+  if (empty) empty.hidden = history.length > 0;
+}
+// Reads the student's own Abacus counter once per visit, then redraws the page.
+function maybeLoadStudentAbacusTotal(student, knownValue) {
+  var key = abacusStudentCounterKey(student);
+  if (!key || knownValue !== null || navigator.onLine === false) return;
+  if (state.abacus.studentAutoLoad && state.abacus.studentAutoLoad[key]) return;
+  if (!state.abacus.studentAutoLoad) state.abacus.studentAutoLoad = {};
+  state.abacus.studentAutoLoad[key] = true;
+  loadAbacusStudentTotal(student).then(function (value) {
+    if (value !== null && state.view === 'my-learning' && currentStudent() === student) renderMyLearning();
+  });
 }
 function kpiHtml(label, value, sub, icon, cls) {
   return '<div class="kpi ' + (cls || '') + '">' +
@@ -4543,6 +4976,7 @@ function renderStudentTable() {
 
   body.innerHTML = list.map(function (s) {
     var online = s.lastVisit && (Date.now() - new Date(s.lastVisit).getTime()) < 10 * 60 * 1000;
+    var abacusTotal = abacusStudentTotal(s);
     var statusTag = s.status === 'blocked'
       ? '<span class="pill-status pill-status--blocked">' + svgIcon('ban', 'ico--sm') + ' Blocked</span>'
       : (!s.visitCount ? '<span class="pill-status pill-status--new">' + svgIcon('star', 'ico--sm') + ' Not signed in yet</span>'
@@ -4560,7 +4994,10 @@ function renderStudentTable() {
       '<td>' + esc(formatDate(s.registeredAt)) + '</td>' +
       '<td>' + esc(s.lastVisit ? relativeTime(s.lastVisit) : 'never') + '<p class="hint">' + esc(s.lastVisit ? formatDateTime(s.lastVisit) : '—') + '</p></td>' +
       '<td class="num">' + formatCount(s.visitCount || 0) + '</td>' +
-      '<td class="num">' + formatCount(s.downloadCount || 0) + '</td>' +
+      '<td class="num">' + formatCount(s.downloadCount || 0) +
+        (abacusTotal === null
+          ? '<p class="hint" title="Press “Abacus counters” to read this student\'s shared counter">counter not read</p>'
+          : '<p class="hint" title="Abacus counter shared by every device">Abacus ' + formatCount(abacusTotal) + '</p>') + '</td>' +
       '<td>' + statusTag + '</td>' +
       '<td><div class="row-actions">' +
         '<button type="button" class="btn btn--subtle btn--xs" data-action="student-expand" data-id="' + attr(s.id) + '" title="Show this student\'s downloads">' + svgIcon('chevron-down', 'ico--sm') + ' Details</button>' +
@@ -4571,17 +5008,20 @@ function renderStudentTable() {
       '</div></td></tr>';
     var detail = '';
     if (state.expandedStudent === s.id) {
-      var history = studentDownloads(s).slice(0, 20);
+      var history = studentDownloadHistory(s);
+      var files = summarizeDownloads(history).slice(0, 12);
       detail = '<tr class="detail-row"><td colspan="10"><div class="detail-box">' +
-        '<div><h4>Download history (' + formatCount(studentDownloads(s).length) + ')</h4>' +
-          (history.length ? '<ul class="mini-list">' + history.map(function (d) {
-            return '<li><span>' + esc(d.title || d.fileName) + '</span><span class="when">' + esc(relativeTime(d.at)) + '</span></li>';
+        '<div><h4>Files downloaded (' + formatCount(history.length) + ' download' + (history.length === 1 ? '' : 's') + ')</h4>' +
+          (files.length ? '<ul class="mini-list">' + files.map(function (g) {
+            return '<li><span>' + esc(g.title) + (g.topic ? ' <span class="muted">· ' + esc(g.topic) + '</span>' : '') + '</span>' +
+              '<span class="when">' + formatCount(g.count) + '×</span></li>';
           }).join('') + '</ul>' : '<p class="text-sm muted">No downloads yet.</p>') + '</div>' +
         '<div><h4>Visit record</h4>' +
           '<dl class="key-value"><dt>First visit</dt><dd>' + esc(formatDateTime(s.firstVisit || s.registeredAt)) + '</dd></dl>' +
           '<dl class="key-value"><dt>Last visit</dt><dd>' + esc(formatDateTime(s.lastVisit)) + '</dd></dl>' +
           '<dl class="key-value"><dt>Total visits</dt><dd>' + formatCount(s.visitCount || 0) + '</dd></dl>' +
-          '<dl class="key-value"><dt>Downloads</dt><dd>' + formatCount(s.downloadCount || 0) + '</dd></dl></div>' +
+          '<dl class="key-value"><dt>Downloads recorded</dt><dd>' + formatCount(s.downloadCount || 0) + '</dd></dl>' +
+          '<dl class="key-value"><dt>Abacus counter</dt><dd>' + (abacusTotal === null ? 'not read yet' : formatCount(abacusTotal)) + '</dd></dl></div>' +
         '<div><h4>Issued credentials</h4>' +
           '<dl class="key-value"><dt>Username</dt><dd class="mono">' + esc(s.username) + '</dd></dl>' +
           '<dl class="key-value"><dt>Password</dt><dd class="mono">' + esc(s.password) + '</dd></dl>' +
@@ -4603,6 +5043,19 @@ function renderStudentTable() {
   }
   var empty = $('#students-empty');
   if (empty) empty.hidden = state.students.length > 0;
+
+  var note = $('#student-abacus-note');
+  if (note) {
+    var scan = state.abacus.studentScan;
+    if (scan && scan.running) {
+      note.textContent = 'Reading Abacus student counters… ' + scan.done + ' of ' + scan.total;
+    } else {
+      var read = list.filter(function (s) { return abacusStudentTotal(s) !== null; }).length;
+      note.textContent = read
+        ? 'Abacus counters read for ' + read + ' of ' + list.length + ' listed student' + (list.length === 1 ? '' : 's') + '.'
+        : 'Press “Abacus counters” to read each student\'s download total from Abacus.';
+    }
+  }
 }
 function renderFeeds() {
   var logins = $('#logins-feed');
@@ -4845,12 +5298,19 @@ function setSwitch(sel, value) {
 
 /* ------------------------------- 7c. Exports ------------------------------ */
 function exportStudentsCsv() {
-  var rows = [['First name', 'Year level', 'Username', 'Password', 'Registered', 'Last visit', 'Visits', 'Downloads', 'Status', 'Last download']];
+  var rows = [['First name', 'Year level', 'Username', 'Password', 'Registered', 'Last visit', 'Visits',
+    'Downloads recorded', 'Abacus downloads', 'Files downloaded', 'Last download', 'Status']];
   state.students.forEach(function (s) {
-    var last = studentDownloads(s)[0];
+    var history = studentDownloadHistory(s);
+    var last = history[0];
+    var abacus = abacusStudentTotal(s);
+    var files = summarizeDownloads(history).slice(0, 10)
+      .map(function (g) { return g.title + ' ×' + g.count; }).join('; ');
     rows.push([s.firstName, s.year, s.username, s.password, formatDateTime(s.registeredAt),
       s.lastVisit ? formatDateTime(s.lastVisit) : 'never', s.visitCount || 0, s.downloadCount || 0,
-      s.status === 'blocked' ? 'Blocked' : 'Active', last ? (last.title + ' (' + formatDateTime(last.at) + ')') : '']);
+      abacus === null ? 'not read' : abacus, files,
+      last ? (last.title + ' (' + formatDateTime(last.at) + ')') : '',
+      s.status === 'blocked' ? 'Blocked' : 'Active']);
   });
   downloadText('madv-students-' + todayKey() + '.csv', toCsv(rows), 'text/csv;charset=utf-8');
   toast('Student register exported as CSV.', 'success');
@@ -4968,12 +5428,10 @@ function fetchFileBlob(item) {
 function downloadResource(id) {
   var item = findResource(id);
   if (!item) return;
-  if (state.settings.requireLogin && !currentStudent() && !currentAdmin()) {
-    toast('Please log in as a student to download files.', 'warn');
-    openStudentAuth('login');
-    return;
-  }
-  var student = currentStudent();
+  // Register + log in first, then download from your own My learning page.
+  var access = downloadAccess(item);
+  if (!access.ok) { openDownloadGate(access, item); return; }
+  var student = access.student;
   toast('Preparing ' + item.fileName + '…', 'info');
   fetchFileBlob(item).then(function (blob) {
     downloadBlob(item.fileName, blob);
@@ -5008,6 +5466,11 @@ function downloadResource(id) {
 function openApp(id) {
   var item = findResource(id);
   if (!item) return;
+  // Opening a mini app hands over the resource itself, so it needs an account too.
+  if (!currentAdmin() && !isTeacher() && !currentStudent()) {
+    openDownloadGate({ ok: false, reason: 'guest', student: null }, item);
+    return;
+  }
   fetchFileBlob(item).then(function (blob) {
     if (item.ext === 'html' || item.ext === 'htm') {
       var html = 'text/html';
@@ -5414,7 +5877,9 @@ function saveOptions() {
   state.settings.syncEnabled = $('#opt-sync-enabled').checked;
   state.settings.syncRosterInRepo = $('#opt-sync-roster').checked;
   state.settings.openRegistration = $('#opt-open-registration').checked;
-  state.settings.requireLogin = $('#opt-require-login').checked;
+  // The download policy is not optional: registered students only, on their own
+  // My learning page, so the per-student counters stay trustworthy.
+  state.settings.requireLogin = true;
   state.settings.showBlockedMessage = $('#opt-blocked-copy').checked;
   state.settings.defaultOwner = $('#opt-default-owner').value.trim();
   state.settings.maxSizeMB = Math.max(1, Math.min(95, Number($('#opt-max-size').value) || 25));
@@ -5774,42 +6239,108 @@ function renderAdminAuth() {
 }
 
 /* --------------------------- Student profile (admin) --------------------- */
+// Everything the register knows about one student: issued credentials, activity,
+// their own Abacus download counter and the exact files they downloaded.
+function studentProfileBody(s) {
+  var history = studentDownloadHistory(s);
+  var files = summarizeDownloads(history);
+  var abacusTotal = abacusStudentTotal(s);
+  var rows = files.slice(0, 12).map(function (g) {
+    var resourceKey = studentHistoryResourceKey(g);
+    var fileTotal = abacusStudentFileTotalByResourceKey(s, resourceKey);
+    return '<tr>' +
+      '<td class="wrap-cell"><b>' + esc(g.title) + '</b><p class="hint">' + esc(g.fileName || '') + '</p></td>' +
+      '<td><span class="tag tag--slate">' + esc(g.category || 'File') + '</span>' + (g.topic ? '<p class="hint">' + esc(g.topic) + '</p>' : '') + '</td>' +
+      '<td class="num">' + formatCount(g.count) + '</td>' +
+      '<td>' + esc(formatDateTime(g.lastAt)) + '<p class="hint">' + esc(relativeTime(g.lastAt)) + '</p></td>' +
+      '<td class="num" data-profile-file="' + attr(resourceKey) + '">' +
+        (fileTotal === null ? '<span class="hint">not read</span>' : formatCount(fileTotal)) + '</td>' +
+      '</tr>';
+  }).join('');
+  return '<div class="stack">' +
+      '<div class="split split--even">' +
+        '<div>' +
+          '<h3 class="block-title text-sm mb-3">Issued credentials</h3>' +
+          '<dl class="key-value"><dt>First name</dt><dd>' + esc(s.firstName) + '</dd></dl>' +
+          '<dl class="key-value"><dt>Year level</dt><dd>' + esc(s.year) + '</dd></dl>' +
+          '<dl class="key-value"><dt>Username</dt><dd class="mono">' + esc(s.username) + '</dd></dl>' +
+          '<dl class="key-value"><dt>Password</dt><dd class="mono">' + esc(s.password) + '</dd></dl>' +
+          '<dl class="key-value"><dt>Status</dt><dd>' + (s.status === 'blocked' ? 'Blocked' : 'Active') + '</dd></dl>' +
+          '<dl class="key-value"><dt>Registered</dt><dd>' + esc(formatDateTime(s.registeredAt)) + '</dd></dl>' +
+        '</div>' +
+        '<div>' +
+          '<h3 class="block-title text-sm mb-3">Activity</h3>' +
+          '<dl class="key-value"><dt>Total visits</dt><dd>' + formatCount(s.visitCount || 0) + '</dd></dl>' +
+          '<dl class="key-value"><dt>Last visit</dt><dd>' + esc(formatDateTime(s.lastVisit)) + ' (' + esc(relativeTime(s.lastVisit)) + ')</dd></dl>' +
+          '<dl class="key-value"><dt>Downloads recorded</dt><dd>' + formatCount(s.downloadCount || 0) + '</dd></dl>' +
+          '<dl class="key-value"><dt>Abacus counter</dt><dd id="profile-abacus-downloads">' +
+            (abacusTotal === null ? 'reading…' : formatCount(abacusTotal) + (abacusTotal === 1 ? ' download' : ' downloads')) + '</dd></dl>' +
+          '<dl class="key-value"><dt>Last download</dt><dd>' + esc(s.lastDownloadAt ? formatDateTime(s.lastDownloadAt) : (history[0] ? formatDateTime(history[0].at) : '—')) + '</dd></dl>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<h3 class="block-title text-sm mb-2">Files downloaded by this student (' + formatCount(files.length) + ')</h3>' +
+        (files.length
+          ? '<div class="table-wrap"><table class="data">' +
+              '<thead><tr><th scope="col">File</th><th scope="col">Type / topic</th><th scope="col" class="num">Times</th>' +
+              '<th scope="col">Last download</th><th scope="col" class="num" title="Abacus counter for this student and this exact file">Abacus</th></tr></thead>' +
+              '<tbody>' + rows + '</tbody></table></div>' +
+            (files.length > 12 ? '<p class="hint mt-2">Showing the 12 most recent files of ' + formatCount(files.length) + '.</p>' : '')
+          : '<p class="text-sm muted">This student has not downloaded anything yet. Downloads are only possible after signing in, from My learning.</p>') +
+      '</div>' +
+      '<div class="notice notice--info"><div><b>Where these numbers come from.</b> “Downloads recorded” is the shared register tally (Supabase). The <b>Abacus</b> columns are the public per-student counters that every device increments when this student downloads; they are approximate, hold no personal data and are refreshed on demand.</div></div>' +
+    '</div>';
+}
 function openStudentProfile(id) {
   var s = findStudent(id);
   if (!s) return;
-  var history = studentDownloads(s).slice(0, 25);
-  var body = '<div class="split split--even">' +
-      '<div>' +
-        '<h3 class="block-title text-sm mb-3">Issued credentials</h3>' +
-        '<dl class="key-value"><dt>First name</dt><dd>' + esc(s.firstName) + '</dd></dl>' +
-        '<dl class="key-value"><dt>Year level</dt><dd>' + esc(s.year) + '</dd></dl>' +
-        '<dl class="key-value"><dt>Username</dt><dd class="mono">' + esc(s.username) + '</dd></dl>' +
-        '<dl class="key-value"><dt>Password</dt><dd class="mono">' + esc(s.password) + '</dd></dl>' +
-        '<dl class="key-value"><dt>Status</dt><dd>' + (s.status === 'blocked' ? 'Blocked' : 'Active') + '</dd></dl>' +
-        '<dl class="key-value"><dt>Registered</dt><dd>' + esc(formatDateTime(s.registeredAt)) + '</dd></dl>' +
-      '</div>' +
-      '<div>' +
-        '<h3 class="block-title text-sm mb-3">Activity</h3>' +
-        '<dl class="key-value"><dt>Total visits</dt><dd>' + formatCount(s.visitCount || 0) + '</dd></dl>' +
-        '<dl class="key-value"><dt>Last visit</dt><dd>' + esc(formatDateTime(s.lastVisit)) + ' (' + esc(relativeTime(s.lastVisit)) + ')</dd></dl>' +
-        '<dl class="key-value"><dt>Downloads</dt><dd>' + formatCount(s.downloadCount || 0) + '</dd></dl>' +
-        '<h3 class="block-title text-sm mt-4 mb-2">Download history</h3>' +
-        (history.length ? '<ul class="mini-list">' + history.map(function (d) {
-          return '<li><span>' + esc(d.title || d.fileName) + '</span><span class="when">' + esc(relativeTime(d.at)) + '</span></li>';
-        }).join('') + '</ul>' : '<p class="text-sm muted">No downloads recorded.</p>') +
-      '</div>' +
-    '</div>';
   openModal({
     name: 'student-profile', icon: 'user', badge: s.status === 'blocked' ? 'rose' : 'emerald',
     title: s.firstName + ' · ' + s.year, subtitle: 'Username ' + s.username + ' · password ' + s.password,
-    size: 'wide', body: body,
+    size: 'wide', body: studentProfileBody(s),
     actions: [
+      { label: 'Refresh Abacus counters', action: 'profile-refresh-abacus', id: s.id, variant: 'btn--outline', icon: 'refresh' },
       { label: 'Copy sign-in details', action: 'student-copy', id: s.id, variant: 'btn--outline', icon: 'copy' },
       { label: 'Reset password', action: 'student-reset', id: s.id, variant: 'btn--outline', icon: 'key' },
       { label: s.status === 'blocked' ? 'Unblock' : 'Block', action: 'student-block', id: s.id, variant: 'btn--subtle', icon: 'ban' },
       { label: 'Delete', action: 'student-delete', id: s.id, variant: 'btn--danger-soft', icon: 'trash' }
     ]
   });
+  loadStudentProfileAbacus(s, false);
+}
+// Fills the profile's Abacus cells: the student's own total first, then each
+// file, one request at a time so the public counter API is not hammered.
+function loadStudentProfileAbacus(s, force) {
+  var cells = $$('[data-profile-file]');
+  if (!document.querySelector('[data-modal="student-profile"]')) return;
+  var totalCell = $('#profile-abacus-downloads');
+  if (totalCell && force) totalCell.textContent = 'reading…';
+  loadAbacusStudentTotal(s, force).then(function (value) {
+    var cell = $('#profile-abacus-downloads');
+    if (!cell) return;
+    cell.textContent = value === null ? 'Abacus unavailable' : formatCount(value) + (value === 1 ? ' download' : ' downloads');
+  });
+  var keys = cells.map(function (cell) {
+    return { cell: cell, key: abacusStudentFileCounterKeyForResourceKey(s, cell.dataset.profileFile || '') };
+  }).filter(function (entry) { return !!entry.key; });
+  var index = 0;
+  function nextCell() {
+    if (index >= keys.length) return;
+    var entry = keys[index++];
+    var known = state.abacus.studentFiles[entry.key];
+    var wait = (index > 1) ? new Promise(function (resolve) { setTimeout(resolve, ABACUS_FILE_LOOKUP_GAP_MS); }) : Promise.resolve();
+    wait.then(function () {
+      if (!entry.cell.isConnected) return;
+      if (!force && typeof known === 'number') { entry.cell.textContent = formatCount(known); return nextCell(); }
+      entry.cell.textContent = '…';
+      return loadAbacusStudentFileTotalByKey(entry.key, force).then(function (value) {
+        if (!entry.cell.isConnected) return;
+        entry.cell.textContent = value === null ? '—' : formatCount(value);
+        return nextCell();
+      });
+    });
+  }
+  nextCell();
 }
 function openEditResource(id) {
   var r = findResource(id);
@@ -5870,8 +6401,9 @@ function openHelp() {
         '<li>Click <b>Student Login</b>.</li>' +
         '<li>Register with your first name and year level.</li>' +
         '<li>The site gives you a username and password — save them.</li>' +
-        '<li>Download homework, worksheets, practice and revision materials.</li>' +
-        '<li>Every download is recorded for your teacher.</li></ol></div>' +
+        '<li>Log in — downloads are locked until you have an account.</li>' +
+        '<li>Open <b>My learning</b> and download your homework, worksheets, practice and revision materials from there.</li>' +
+        '<li>Every download is recorded for your teacher with the file and the time, and counted in your own Abacus counter.</li></ol></div>' +
       '<div><h3 class="block-title text-sm mb-2">For the teacher</h3><ol class="text-sm muted" style="list-style:decimal;padding-left:1.1rem;display:grid;gap:.4rem">' +
         '<li>Sign in as admin (default <b>peter82</b> / <b>petgabs82</b>).</li>' +
         '<li>Save a GitHub access token in <b>Cloud settings</b>.</li>' +
@@ -5895,6 +6427,28 @@ var ACTIONS = {
   },
   'open-dashboard': function () { openAdminDashboard(true); },
   'open-student-auth': function () { openStudentAuth('login'); },
+  'open-register': function () { openStudentAuth('register'); },
+  'gate-register': function () { closeModal(); openStudentAuth('register'); },
+  'gate-login': function () { closeModal(); openStudentAuth('login'); },
+  'gate-my-learning': function (el) {
+    var item = findResource(el.dataset.id);
+    closeModal();
+    showView('my-learning');
+    renderMyLearning();
+    if (item) downloadResource(item.id);
+    else toast('Downloads are open on your My learning page.', 'info');
+  },
+  'refresh-student-counters': function () {
+    if (!currentAdmin()) return openAdminAuth();
+    refreshAbacusStudentTotals(state.students, false);
+  },
+  'profile-refresh-abacus': function (el) {
+    var s = findStudent(el.dataset.id);
+    if (!s) return;
+    setModalBody(studentProfileBody(s));
+    loadStudentProfileAbacus(s, true);
+    toast('Reading this student\'s Abacus counters…', 'info');
+  },
   'open-admin-auth': function () { openAdminAuth(); },
   'open-help': function () { openHelp(); },
   'logout': function () { closeModal(); logout(); },
