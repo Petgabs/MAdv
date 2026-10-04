@@ -1,69 +1,19 @@
 {
-  "_comment": "Password-free cloud snapshot. This file is public in a public repository and may contain student names, usernames and activity counts; passwords must never be written here.",
+  "_comment": "Mirror of the shared backend (Supabase), written automatically by .github/workflows/cloud-sync.yml. Public: holds names, usernames and counts, never passwords.",
+  "source": "shared-backend",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-03T13:07:24.341Z",
+  "updatedAt": "2026-10-04T10:38:55Z",
   "counters": {
-    "visits": 2,
-    "visitsToday": 2,
-    "uniqueVisitors": 1,
+    "day": "2026-10-04",
+    "daily": {},
+    "visits": 0,
     "downloads": 0,
+    "visitsToday": 0,
     "downloadsToday": 0,
-    "day": "2026-10-03",
-    "daily": {
-      "2026-10-03": 2
-    },
-    "devices": [
-      "dev_musdk4k3lnwkpm"
-    ]
+    "uniqueVisitors": 0
   },
   "students": [],
-  "logins": [
-    {
-      "at": "2026-10-03T12:45:51.731Z",
-      "studentId": null,
-      "name": "Administrator (peter82)",
-      "year": "",
-      "ok": true,
-      "kind": "Admin sign in"
-    },
-    {
-      "at": "2026-10-03T12:45:30.640Z",
-      "studentId": null,
-      "name": "maria",
-      "year": "",
-      "ok": false,
-      "kind": "Unknown username"
-    },
-    {
-      "at": "2026-10-03T12:42:09.097Z",
-      "studentId": null,
-      "name": "Administrator (peter82)",
-      "year": "",
-      "ok": true,
-      "kind": "Admin sign in"
-    },
-    {
-      "at": "2026-10-03T12:36:04.126Z",
-      "studentId": null,
-      "name": "Administrator (peter82)",
-      "year": "",
-      "ok": true,
-      "kind": "Admin sign in"
-    }
-  ],
+  "logins": [],
   "downloads": [],
-  "visits": [
-    {
-      "at": "2026-10-03T13:07:18.509Z",
-      "studentId": null,
-      "name": "Administrator",
-      "year": ""
-    },
-    {
-      "at": "2026-10-03T12:35:07.155Z",
-      "studentId": null,
-      "name": "Visitor",
-      "year": ""
-    }
-  ]
+  "visits": []
 }
