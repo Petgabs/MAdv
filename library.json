@@ -1,7 +1,7 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T18:12:32.229Z",
+  "updatedAt": "2026-10-04T18:14:36.615Z",
   "resources": [
     {
       "id": "res_muu4yb47bq348b",
@@ -27,25 +27,25 @@
       "published": true
     },
     {
-      "id": "res_muu51wevgt1kmw",
-      "title": "Mini apps",
-      "fileName": "MathsAdvanced_MCQ_Revision.html",
-      "ext": "html",
-      "kind": "app",
+      "id": "res_muu54ke0ih6c4c",
+      "title": "Attendance Sheet",
+      "fileName": "attendance_sheet.pdf",
+      "ext": "pdf",
+      "kind": "document",
       "year": "Year 11",
       "topic": "Mixed revision — all topics",
-      "category": "Revision questions",
+      "category": "Practice questions",
       "description": "",
       "owner": "peter82",
       "department": "Mathematics",
       "keywords": [],
-      "addedAt": "2026-10-04T18:12:32.215Z",
-      "bytes": 692236,
+      "addedAt": "2026-10-04T18:14:36.600Z",
+      "bytes": 46877,
       "downloads": 0,
       "lastDownloadAt": null,
       "visible": true,
       "visibility": "all",
-      "path": "resources/Year 11/MathsAdvanced_MCQ_Revision.html",
+      "path": "resources/Year 11/attendance_sheet.pdf",
       "source": "cloud",
       "published": true
     }
