@@ -1,31 +1,8 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T17:21:40.815Z",
+  "updatedAt": "2026-10-04T17:21:45.999Z",
   "resources": [
-    {
-      "id": "res_mutjy5znm0jowv",
-      "title": "Knox 2025 W. Sol",
-      "fileName": "Knox 2025 w. sol.pdf",
-      "ext": "pdf",
-      "kind": "document",
-      "year": "Year 11",
-      "topic": "Mixed revision — all topics",
-      "category": "Practice questions",
-      "description": "",
-      "owner": "peter82",
-      "department": "Mathematics",
-      "keywords": [],
-      "addedAt": "2026-10-04T08:21:46.067Z",
-      "bytes": 1225287,
-      "downloads": 5,
-      "lastDownloadAt": "2026-10-04T16:44:43Z",
-      "visible": true,
-      "visibility": "all",
-      "path": "resources/Year 11/Knox 2025 w. sol.pdf",
-      "source": "cloud",
-      "published": true
-    },
     {
       "id": "res_mutw4iuyw6ig74",
       "title": "Sydney Boys 2026 W. Sol",
