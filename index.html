@@ -4784,6 +4784,7 @@ function pullLibrary() {
 }
 function mergeCloudResources(list) {
   var added = 0;
+  var changed = false;
   list.forEach(function (remote) {
     if (!remote || !remote.fileName) return;
     var local = null;
@@ -4808,8 +4809,16 @@ function mergeCloudResources(list) {
       local.visible = remote.visible !== false;
       local.source = 'cloud';
       local.published = true;
-      local.downloads = Math.max(local.downloads || 0, remote.downloads || 0);
-      if (remote.addedAt) local.addedAt = remote.addedAt;
+      var mergedDownloads = Math.max(local.downloads || 0, remote.downloads || 0);
+      if (mergedDownloads !== (local.downloads || 0)) { local.downloads = mergedDownloads; changed = true; }
+      // The published library carries the last-download time from whichever
+      // device made the download, so merge it like the total above — otherwise
+      // a device that is offline (or has no shared backend) shows "never".
+      if (remote.lastDownloadAt && (!local.lastDownloadAt || new Date(remote.lastDownloadAt) > new Date(local.lastDownloadAt))) {
+        local.lastDownloadAt = remote.lastDownloadAt;
+        changed = true;
+      }
+      if (remote.addedAt && remote.addedAt !== local.addedAt) { local.addedAt = remote.addedAt; changed = true; }
     } else {
       state.resources.push(Object.assign({}, remote, {
         id: remote.id || uid('res'),
@@ -4820,7 +4829,7 @@ function mergeCloudResources(list) {
       added++;
     }
   });
-  if (added) saveResources();
+  if (added || changed) saveResources();
   return added;
 }
 /* Migration helper: read the file list straight from the repository so an

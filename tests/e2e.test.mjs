@@ -233,6 +233,23 @@ app.downloadResource(otherItem.id);
 await new Promise((r) => setTimeout(r, 250));
 check('a file from another year level downloads from My learning', otherItem.downloads === 1 && /Year 11 revision/.test(window.document.querySelector('#ml-history-body').textContent), { downloads: otherItem.downloads });
 
+console.log('\n5c. the published library merges download totals and last-download times');
+const publishedRow = { id: 'res_pub', title: 'Mirror', fileName: 'mirror.pdf', source: 'cloud', path: 'Year 12/mirror.pdf', downloads: 0 };
+app.state.resources.push(publishedRow);
+const rowsBeforeMerge = app.state.resources.length;
+const mergedAdded = app.mergeCloudResources([{ id: 'res_pub', fileName: 'mirror.pdf', path: 'Year 12/mirror.pdf', downloads: 9, lastDownloadAt: '2026-10-01T05:00:00Z' }]);
+check('a merge into an existing row adds no duplicate', mergedAdded === 0 && app.state.resources.length === rowsBeforeMerge, { added: mergedAdded, rows: app.state.resources.length });
+check('the published download total is merged', publishedRow.downloads === 9, publishedRow.downloads);
+check('the published last-download time is merged', publishedRow.lastDownloadAt === '2026-10-01T05:00:00Z', publishedRow.lastDownloadAt);
+const storedRows = JSON.parse(window.localStorage.getItem('madv.resources.v2'));
+const storedRow = storedRows.filter((r) => r.id === 'res_pub')[0];
+check('merged totals are persisted, not just kept in memory', !!storedRow && storedRow.downloads === 9 && storedRow.lastDownloadAt === '2026-10-01T05:00:00Z', storedRow);
+publishedRow.lastDownloadAt = '2026-12-01T00:00:00Z';
+app.mergeCloudResources([{ id: 'res_pub', fileName: 'mirror.pdf', path: 'Year 12/mirror.pdf', downloads: 9, lastDownloadAt: '2026-10-01T05:00:00Z' }]);
+check('an older published timestamp never overwrites a newer local one', publishedRow.lastDownloadAt === '2026-12-01T00:00:00Z', publishedRow.lastDownloadAt);
+app.state.resources = app.state.resources.filter((r) => r.id !== 'res_pub');
+app.saveResources();
+
 console.log('\n6. admin pulls the shared register live');
 app.loginAdmin('peter82', 'petgabs82');
 const added = await app.syncPullRoster();
