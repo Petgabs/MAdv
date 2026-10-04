@@ -1,6 +1,6 @@
 // End-to-end test: load the real index.html in jsdom, point its network calls
 // at fake Supabase, Abacus and GitHub endpoints, then register, sign in, count
-// shared visits and downloads, and pull the admin register.
+// every full-page Abacus visit and published resource access, and pull the admin register.
 import { JSDOM } from 'jsdom';
 import { createBackend } from './fake-supabase.mjs';
 import { readFileSync } from 'node:fs';
@@ -28,6 +28,17 @@ const eventually = async (predicate, timeoutMs = 6000) => {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   return !!predicate();
+};
+const storageSnapshot = (w) => {
+  const copy = (storage) => {
+    const out = {};
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key) out[key] = storage.getItem(key);
+    }
+    return out;
+  };
+  return { local: copy(w.localStorage), session: copy(w.sessionStorage) };
 };
 
 const syncConfig = JSON.stringify({ provider: 'supabase', url: backend.url, publishableKey: 'sb_publishable_test' });
@@ -87,11 +98,13 @@ const dom = new JSDOM(html, {
         if (url.includes('sync-config.json')) return json(githubState.syncConfig === null ? 404 : 200, githubState.syncConfig);
         if (url.includes('cloud-data.json')) return json(githubState.cloudData === null ? 404 : 200, githubState.cloudData);
         if (url.includes('library.json')) return json(200, githubState.library);
-        if (/\.pdf$/i.test(url.split('?')[0])) {
+        if (/\.(?:pdf|html?)$/i.test(url.split('?')[0])) {
+          const isHtml = /\.html?$/i.test(url.split('?')[0]);
+          const body = isHtml ? '<!doctype html><title>Test mini app</title><p>ready</p>' : '%PDF-1.4 test';
           return Promise.resolve({
             ok: true, status: 200,
-            blob: () => Promise.resolve(new window.Blob(['%PDF-1.4 test'], { type: 'application/pdf' })),
-            text: () => Promise.resolve('%PDF-1.4 test')
+            blob: () => Promise.resolve(new window.Blob([body], { type: isHtml ? 'text/html' : 'application/pdf' })),
+            text: () => Promise.resolve(body)
           });
         }
         return json(404, {});
@@ -157,24 +170,49 @@ check('blocked student refused everywhere', await (async () => {
 })());
 await app.syncAdminStudent('upsert', Object.assign({}, reg.student, { status: 'active' }));
 
-console.log('\n4. visitor counter is shared');
+console.log('\n4. every full page load counts as an Abacus page view');
 app.state.students = app.state.students.filter((s) => s.id !== reg.student.id);
 app.state.students.push(reg.student);
+app.saveStudents();
 app.state.session = { role: 'student', studentId: reg.student.id, at: new Date().toISOString() };
+app.saveSession();
+// Let the initial pages finish their first counter calls so each reload below
+// can prove that it adds exactly one new Abacus hit.
+await new Promise((r) => setTimeout(r, 900));
+const visitCounterId = app.ABACUS_NAMESPACE + '/visits';
+const pageViewsBefore = abacusState.get(visitCounterId) || 0;
+const guestPage = await secondBrowser({ noConfig: true });
+const guestLoadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 1);
+check('a guest full page load increments Abacus', guestLoadCounted, abacusState.get(visitCounterId));
+const guestReload = await secondBrowser({ noConfig: true, storage: storageSnapshot(guestPage.window) });
+const guestReloadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 2);
+check('reloading as the same guest increments Abacus again', guestReloadCounted, abacusState.get(visitCounterId));
+const registeredPage = await secondBrowser({ storage: storageSnapshot(app) });
+const registeredLoadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 3);
+check('a registered signed-in page load increments Abacus',
+  registeredLoadCounted && registeredPage.window.currentStudent() && registeredPage.window.currentStudent().username === 'ada',
+  { total: abacusState.get(visitCounterId), student: registeredPage.window.currentStudent() && registeredPage.window.currentStudent().username });
+const returningPage = await secondBrowser({ storage: storageSnapshot(registeredPage.window) });
+const returningLoadCounted = await eventually(() => abacusState.get(visitCounterId) === pageViewsBefore + 4);
+check('a returning student reload increments Abacus again',
+  returningLoadCounted && returningPage.window.currentStudent() && returningPage.window.currentStudent().username === 'ada',
+  { total: abacusState.get(visitCounterId), student: returningPage.window.currentStudent() && returningPage.window.currentStudent().username });
+
+console.log('\n4b. visitor counter remains shared with the detailed backend');
 const before = Number(app.state.counters.visits);
 await app.syncVisit();
 const stats = await app.syncStats();
 check('backend counted at least one visit', stats.visits >= 1, stats.visits);
 check('local counter adopted the shared total', app.state.counters.visits >= Math.max(before, stats.visits), { local: app.state.counters.visits, shared: stats.visits });
-await app.syncVisit();           // immediate repeat
+await app.syncVisit();           // rapid detailed-log repeat
 const after = await app.syncStats();
-check('a refresh does not double count', after.visits === stats.visits, { first: stats.visits, second: after.visits });
+check('the detailed Supabase visit log still de-duplicates a rapid repeat', after.visits === stats.visits, { first: stats.visits, second: after.visits });
 const other = await secondBrowser();
 await other.window.syncVisit();
 const stats3 = await app.syncStats();
 check('a different device adds a unique visitor', stats3.uniqueVisitors >= 2, stats3.uniqueVisitors);
 await app.loadAbacusTotals(true);
-check('Abacus stores the shared visit total', abacusState.get('petgabs-github-io-madv/visits') >= 2, abacusState.get('petgabs-github-io-madv/visits'));
+check('Abacus stores the shared visit total', abacusState.get('petgabs-github-io-madv/visits') >= pageViewsBefore + 5, abacusState.get('petgabs-github-io-madv/visits'));
 check('Abacus connection is visible to the app', app.state.abacus.status === 'ok', app.state.abacus.status);
 await other.window.loadAbacusTotals(true);
 check('a second browser reads the same Abacus total', other.window.state.counters.visits === abacusState.get('petgabs-github-io-madv/visits'), other.window.state.counters.visits);
@@ -183,7 +221,7 @@ check('visitor totals use the documented Abacus API host and namespace',
 check('visitor increments are sent to Abacus /hit/namespace/visits',
   abacusRequests.some((request) => request.operation === 'hit' && request.namespace === app.ABACUS_NAMESPACE && request.key === 'visits'));
 
-console.log('\n4b. Abacus rate-limit responses do not lose counter hits');
+console.log('\n4c. Abacus rate-limit responses do not lose counter hits');
 const rateLimitProbe = 'file-rate-limit-probe';
 const rateLimitProbeId = app.ABACUS_NAMESPACE + '/' + rateLimitProbe;
 abacusRateLimitOnce.add(rateLimitProbeId);
@@ -273,7 +311,41 @@ check('each published file gets a separate Abacus counter',
   abacusState.get('petgabs-github-io-madv/' + abacusFileKey) === 3,
   { firstFile: abacusState.get('petgabs-github-io-madv/' + abacusFileKey), otherFile: abacusState.get('petgabs-github-io-madv/' + otherItemAbacusKey) });
 
-console.log('\n5c. the published library merges download totals and last-download times');
+console.log('\n5c. opening a published Interactive HTML app follows the download tracking path');
+await eventually(() => abacusState.get('petgabs-github-io-madv/' + studentKey) === 4);
+const miniApp = {
+  id: 'mini_app_1', title: 'Functions explorer', fileName: 'functions-explorer.html', ext: 'html', kind: 'app',
+  source: 'cloud', path: 'Year 12/functions-explorer.html', category: 'Practice questions', topic: 'Functions', year: 'Year 12', downloads: 0
+};
+app.state.resources.push(miniApp);
+const appFileKey = app.abacusResourceCounterKey(miniApp);
+const downloadsBeforeAppOpen = abacusState.get('petgabs-github-io-madv/downloads') || 0;
+const studentDownloadsBeforeAppOpen = abacusState.get('petgabs-github-io-madv/' + studentKey) || 0;
+const originalOpen = window.open;
+const openedApps = [];
+window.open = (...args) => { openedApps.push(args); return {}; };
+let openedMiniApp;
+try {
+  openedMiniApp = await app.openApp(miniApp.id);
+} finally {
+  window.open = originalOpen;
+}
+check('the published Interactive HTML app opens', openedMiniApp === miniApp && openedApps.length === 1, openedApps);
+check('opening the app increments the shared Abacus download total',
+  abacusState.get('petgabs-github-io-madv/downloads') === downloadsBeforeAppOpen + 1,
+  abacusState.get('petgabs-github-io-madv/downloads'));
+check('opening the app increments its own Abacus file counter',
+  abacusState.get('petgabs-github-io-madv/' + appFileKey) === 1 && appFileKey.startsWith('file-'),
+  { key: appFileKey, total: abacusState.get('petgabs-github-io-madv/' + appFileKey) });
+check('the app open is logged through the same student download path',
+  miniApp.downloads === 1 &&
+  (app.state.students.find((s) => s.id === reg.student.id).downloads || [])[0].resourceId === miniApp.id &&
+  app.state.logs.downloads[0].resourceId === miniApp.id &&
+  abacusState.get('petgabs-github-io-madv/' + studentKey) === studentDownloadsBeforeAppOpen + 1,
+  { item: miniApp.downloads, student: abacusState.get('petgabs-github-io-madv/' + studentKey), log: app.state.logs.downloads[0] });
+const expectedAdaAbacusTotal = studentDownloadsBeforeAppOpen + 1;
+
+console.log('\n5d. the published library merges download totals and last-download times');
 const publishedRow = { id: 'res_pub', title: 'Mirror', fileName: 'mirror.pdf', source: 'cloud', path: 'Year 12/mirror.pdf', downloads: 0 };
 app.state.resources.push(publishedRow);
 const rowsBeforeMerge = app.state.resources.length;
@@ -317,22 +389,24 @@ console.log('\n6b. the admin register shows each student\'s Abacus counter and t
 app.loginAdmin('peter82', 'petgabs82');
 const ada = app.state.students.find((s) => s.username === 'ada');
 const readTotal = await app.loadAbacusStudentTotal(ada, true);
-check('the per-student Abacus counter reads back', readTotal === 4, readTotal);
+check('the per-student Abacus counter reads back', readTotal === expectedAdaAbacusTotal, readTotal);
 const scanned = await app.refreshAbacusStudentTotals([ada]);
-check('the register button reads counters for listed students', scanned === 1 && app.abacusStudentTotal(ada) === 4, { scanned, total: app.abacusStudentTotal(ada) });
+check('the register button reads counters for listed students', scanned === 1 && app.abacusStudentTotal(ada) === expectedAdaAbacusTotal, { scanned, total: app.abacusStudentTotal(ada) });
 app.showView('dashboard');
 app.renderDashboard();
 const registerText = window.document.querySelector('#students-body').textContent;
-check('the student register shows the Abacus counter beside the downloads', /Abacus 4/.test(registerText), registerText.slice(0, 200));
+check('the student register shows the Abacus counter beside the downloads', new RegExp('Abacus ' + expectedAdaAbacusTotal).test(registerText), registerText.slice(0, 200));
 check('the register panel reports the counters it read', /Abacus counters read for 2 of 2 listed students/.test(window.document.querySelector('#student-abacus-note').textContent), window.document.querySelector('#student-abacus-note').textContent);
 app.openStudentProfile(ada.id);
 await new Promise((r) => setTimeout(r, 600));
 const profile = window.document.querySelector('[data-modal="student-profile"]');
 check('the student profile lists the exact file downloaded', /Practice/.test(profile.textContent) && /a\.pdf/.test(profile.textContent), profile.textContent.slice(0, 160));
-check('the student profile names the Abacus counter', /Abacus counter/.test(profile.textContent) && /4 downloads/.test(profile.textContent), profile.textContent.slice(0, 200));
+check('the student profile names the Abacus counter',
+  /Abacus counter/.test(profile.textContent) && new RegExp(expectedAdaAbacusTotal + ' downloads').test(profile.textContent),
+  profile.textContent.slice(0, 200));
 const fileRows = Array.from(profile.querySelectorAll('tr')).filter((tr) => tr.querySelector('[data-profile-file]'));
-const practiceRow = fileRows.find((tr) => /Practice/.test(tr.textContent));
-const revisionRow = fileRows.find((tr) => /Year 11 revision/.test(tr.textContent));
+const practiceRow = fileRows.find((tr) => /a\.pdf/.test(tr.textContent));
+const revisionRow = fileRows.find((tr) => /b\.pdf/.test(tr.textContent));
 check('the student profile shows a per-file Abacus counter for every file taken',
   !!practiceRow && /^3$/.test(practiceRow.querySelector('[data-profile-file]').textContent.trim()) &&
   !!revisionRow && /^1$/.test(revisionRow.querySelector('[data-profile-file]').textContent.trim()),
@@ -448,6 +522,10 @@ async function secondBrowser(options = {}) {
     pretendToBeVisual: true,
     beforeParse(w) {
       try { Object.defineProperty(w, 'crypto', { value: { randomUUID: () => require('node:crypto').randomUUID(), getRandomValues: (a) => require('node:crypto').randomFillSync(a) }, configurable: true }); } catch (e) {}
+      if (options.storage) {
+        Object.entries(options.storage.local || {}).forEach(([key, value]) => w.localStorage.setItem(key, value));
+        Object.entries(options.storage.session || {}).forEach(([key, value]) => w.sessionStorage.setItem(key, value));
+      }
       w.scrollTo = () => {};
       try { Object.defineProperty(w, 'TextEncoder', { value: TextEncoder, configurable: true }); Object.defineProperty(w, 'TextDecoder', { value: TextDecoder, configurable: true }); } catch (e) {}
       try { Object.defineProperty(w.navigator, 'onLine', { get: () => !simulatedOffline, configurable: true }); } catch (e) {}
@@ -467,6 +545,15 @@ async function secondBrowser(options = {}) {
           if (options.noConfig) return json(404, {});
           if (url.includes('sync-config.json')) return json(githubState.syncConfig === null ? 404 : 200, githubState.syncConfig);
           if (url.includes('library.json')) return json(200, githubState.library);
+          if (/\.(?:pdf|html?)$/i.test(url.split('?')[0])) {
+            const isHtml = /\.html?$/i.test(url.split('?')[0]);
+            const body = isHtml ? '<!doctype html><title>Test mini app</title><p>ready</p>' : '%PDF-1.4 test';
+            return Promise.resolve({
+              ok: true, status: 200,
+              blob: () => Promise.resolve(new w.Blob([body], { type: isHtml ? 'text/html' : 'application/pdf' })),
+              text: () => Promise.resolve(body)
+            });
+          }
           return json(404, {});
         }
         if (simulatedOffline) return Promise.reject(new Error('offline'));

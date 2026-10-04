@@ -3562,7 +3562,7 @@ function recordStudentVisit(student, at) {
   maybePushAnalytics();
 }
 
-function recordVisit() {
+function recordVisit(options) {
   rollDay();
   var id = deviceId();
   if (!Array.isArray(state.counters.devices)) state.counters.devices = [];
@@ -3585,7 +3585,9 @@ function recordVisit() {
   }
   saveCounters();
   // Abacus counts site-wide visits independently of the shared student backend.
-  var abacusEvent = countAbacusVisit();
+  // Full page loads call it directly from init; callers that only need the
+  // detailed local/Supabase log can avoid a duplicate hit with skipAbacus.
+  var abacusEvent = options && options.skipAbacus ? Promise.resolve(null) : countAbacusVisit();
   // Keep the Supabase activity log and per-student visit history when configured.
   if (repoParts()) {
     loadSyncConfig().then(function () { return syncVisit(); }).catch(function () { /* offline */ });
@@ -3644,6 +3646,34 @@ function recordDownload(item, student) {
   saveCounters();
   maybePushAnalytics();
   return countAbacusDownload(item, student);
+}
+
+/* A successful resource hand-off has one accounting path. A regular document
+   download and an opened HTML mini app must update exactly the same local log,
+   shared Abacus totals and optional student-backend activity. */
+function refreshResourceAccessViews() {
+  renderCounters();
+  if (state.view === 'library') renderLibrary();
+  else if (state.view === 'my-learning') renderMyLearning();
+  else if (currentAdmin()) renderDashboard();
+}
+function trackResourceAccess(item, student) {
+  var abacus = recordDownload(item, student);
+  var backend = syncDownloadEvent(item, student);
+  refreshResourceAccessViews();
+  // Both counter transports handle their own transient failures and queues.
+  // Keep this promise non-fatal so a counted hand-off never turns into a second
+  // browser fallback and accidentally records the same resource twice.
+  return Promise.all([Promise.resolve(abacus), Promise.resolve(backend)]).then(function (results) {
+    return results[0];
+  }, function (err) {
+    recordDiagnostic('counter', errorText(err), 'track resource access');
+    return null;
+  });
+}
+function isInteractiveHtml(item) {
+  var ext = String((item && (item.ext || extOf(item.fileName))) || '').toLowerCase();
+  return ext === 'html' || ext === 'htm';
 }
 
 /* ------------------------------ 5. Students ------------------------------- */
@@ -6832,22 +6862,22 @@ function fetchFileBlob(item) {
 }
 function downloadResource(id) {
   var item = findResource(id);
-  if (!item) return;
+  if (!item) return Promise.resolve(null);
   // Register + log in first, then download from your own My learning page.
   var access = downloadAccess(item);
-  if (!access.ok) { openDownloadGate(access, item); return; }
+  if (!access.ok) { openDownloadGate(access, item); return Promise.resolve(null); }
   var student = access.student;
+  function finish(message, level) {
+    return trackResourceAccess(item, student).then(function () {
+      toast(message, level || 'success');
+      return item;
+    });
+  }
   toast('Preparing ' + item.fileName + '…', 'info');
-  fetchFileBlob(item).then(function (blob) {
+  return fetchFileBlob(item).then(function (blob) {
     downloadBlob(item.fileName, blob);
     // Count only after the file was fetched successfully, not on a failed click.
-    recordDownload(item, student);
-    syncDownloadEvent(item, student);
-    renderCounters();
-    if (state.view === 'library') renderLibrary();
-    else if (state.view === 'my-learning') renderMyLearning();
-    else if (currentAdmin()) renderDashboard();
-    toast('Downloaded ' + item.fileName + (state.counters.downloadsToday ? ' · ' + state.counters.downloadsToday + ' downloads today' : ''), 'success');
+    return finish('Downloaded ' + item.fileName + (state.counters.downloadsToday ? ' · ' + state.counters.downloadsToday + ' downloads today' : ''));
   }).catch(function (err) {
     var urls = resourceUrls(item);
     if (urls.raw) {
@@ -6855,29 +6885,29 @@ function downloadResource(id) {
       a.href = urls.raw; a.download = item.fileName; a.target = '_blank'; a.rel = 'noopener';
       document.body.appendChild(a); a.click(); a.remove();
       // The cross-origin fallback was handed to the browser; record this
-      // fallback attempt because the page cannot observe its completion.
-      recordDownload(item, student);
-      syncDownloadEvent(item, student);
-      renderCounters();
-      if (state.view === 'library') renderLibrary();
-      else if (state.view === 'my-learning') renderMyLearning();
-      else if (currentAdmin()) renderDashboard();
-      toast('Opened ' + item.fileName + ' in a new tab — download failed in the browser (' + err.message + ').', 'warn');
-    } else {
-      toast(err.message, 'error');
+      // fallback hand-off because the page cannot observe its completion.
+      return finish('Opened ' + item.fileName + ' in a new tab — download failed in the browser (' + err.message + ').', 'warn');
     }
+    toast(err.message, 'error');
+    return null;
   });
 }
 function openApp(id) {
   var item = findResource(id);
-  if (!item) return;
+  if (!item) return Promise.resolve(null);
   // Opening a mini app hands over the resource itself, so it needs an account too.
   if (!currentAdmin() && !isTeacher() && !currentStudent()) {
     openDownloadGate({ ok: false, reason: 'guest', student: null }, item);
-    return;
+    return Promise.resolve(null);
   }
-  fetchFileBlob(item).then(function (blob) {
-    if (item.ext === 'html' || item.ext === 'htm') {
+  var student = currentStudent();
+  function trackOpenedApp() {
+    // A device-only draft remains local, while a published app receives the
+    // shared total and stable per-file Abacus hit through this common path.
+    return isInteractiveHtml(item) ? trackResourceAccess(item, student) : Promise.resolve(null);
+  }
+  return fetchFileBlob(item).then(function (blob) {
+    if (isInteractiveHtml(item)) {
       var html = 'text/html';
       var typed = blob.type && blob.type.indexOf('html') >= 0 ? blob : new Blob([blob], { type: html });
       var url = URL.createObjectURL(typed);
@@ -6888,10 +6918,15 @@ function openApp(id) {
       window.open(u, '_blank', 'noopener');
       setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
     }
-  }).catch(function (err) {
+    return trackOpenedApp().then(function () { return item; });
+  }, function (err) {
     var urls = resourceUrls(item);
-    if (urls.raw) window.open(urls.raw, '_blank', 'noopener');
-    else toast(err.message, 'error');
+    if (!urls.raw) {
+      toast(err.message, 'error');
+      return null;
+    }
+    window.open(urls.raw, '_blank', 'noopener');
+    return trackOpenedApp().then(function () { return item; });
   });
 }
 function previewDescriptor(item) {
@@ -8540,10 +8575,15 @@ function init() {
     return 0;
   });
 
+  // Abacus is the public page-view counter: every complete document load,
+  // including a reload and a returning signed-in student, records one visit.
+  // It deliberately has no localStorage debounce. The detailed local/Supabase
+  // visit log keeps its existing 30-minute guard so reloads do not flood it.
+  countAbacusVisit();
   var lastVisit = store.get('madv.lastVisitAt', 0);
   if (!lastVisit || (Date.now() - Number(lastVisit)) > 30 * 60 * 1000) {
     store.set('madv.lastVisitAt', Date.now());
-    recordVisit();
+    recordVisit({ skipAbacus: true });
   }
   rollDay();
 
