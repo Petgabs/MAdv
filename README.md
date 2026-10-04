@@ -151,9 +151,11 @@ stored only in the browser that uploaded them and are marked *This device only*.
    page and starts the download. **My learning** lists the student's year-level
    files plus every other resource on the cloud, so other year levels stay
    reachable.
-6. Every download is recorded for the teacher (student, file and time), added to
-   the student's own Abacus download counter — and to a counter for that student
-   and that exact file — and listed in the admin register and student profile.
+6. Every document/resource download — and every opening of a published
+   **Mini App / Interactive HTML** file — follows the same activity path: it is
+   recorded for the teacher (student, file and time), added to the student's own
+   Abacus download counter and to a counter for that exact file, and listed in
+   the admin register and student profile.
 
 Students can be blocked, deleted or password-reset from the admin page;
 blocked accounts are refused everywhere as soon as the change syncs. A
@@ -210,27 +212,31 @@ add an option everywhere.
 
 ## 7. Counters and cloud sync
 
-* **Visitor counter** (header + footer) — shared through the [Abacus counter API](https://v2.jasoncameron.dev/abacus/). The site counts
-  at most one visit per browser/device every 30 minutes; reloading immediately
-  does not add another hit. Abacus stores the shared all-time total.
-* **Download counter** — shared through Abacus after a published file has been
-  fetched successfully. The header shows all downloads; each published resource
-  has its own counter. Files stored only on the uploading device are never sent
-  to Abacus.
-* **Per-student download counters** — every successful student download also
-  increments two anonymous counters: one for the student (derived from the
-  shared username, so every device reads the same number) and one for that
-  student and that exact file. The admin register shows each student's counter
-  beside their download count, and the student profile reads the per-file
-  counters on demand. The keys are hashes: Abacus never receives a name, a
-  username or a filename. Students also see their own counter on **My
-  learning**.
+* **Visitor / page-view counter** (header + footer) — shared through the [Abacus counter API](https://v2.jasoncameron.dev/abacus/). Every full page
+  load calls Abacus, including a reload and a return by the same browser. This
+  applies equally to guests, registered visitors and signed-in students, so the
+  shared total is a page-view count rather than a unique-person count. Supabase
+  keeps its separate anti-refresh guard for detailed activity logs.
+* **Download and Interactive HTML counter** — shared through Abacus after a
+  published document/resource is handed to the browser, or a published **Mini
+  App / Interactive HTML** file is opened. Both actions use the same tracking
+  path: the header's total and that published resource's own counter each move
+  once. Files stored only on the uploading device are never sent to Abacus.
+* **Per-student download counters** — every successful student document
+  download or published Interactive HTML app opening also increments two
+  anonymous counters: one for the student (derived from the shared username, so
+  every device reads the same number) and one for that student and that exact
+  file. The admin register shows each student's counter beside their download
+  count, and the student profile reads the per-file counters on demand. The
+  keys are hashes: Abacus never receives a name, a username or a filename.
+  Students also see their own counter on **My learning**.
 * **Stable file keys** — the counter key is derived from the repository path
   (or a stable resource id when there is no path). It is hashed into a short,
   URL-safe key; display titles and student details are not sent. Moving a file
   to a new path starts a new per-file counter.
-* **Offline and rate limits** — a visit/download made while the browser already
-  knows it is offline is queued locally and sent once when the connection
+* **Offline and rate limits** — a page-view, download or Interactive HTML app
+  opening made while the browser already knows it is offline is queued locally
+  and sent once when the connection
   returns. Hits in one tab are spaced out to avoid bursts. Abacus HTTP 429
   rate-limit rejections are retried using `Retry-After` (and safely re-queued if
   the limit persists); a timeout or dropped connection is not retried because
@@ -252,7 +258,7 @@ add an option everywhere.
 | --- | --- |
 | Uploaded files (published) | The GitHub repository, folder `resources/<Year level>/…` |
 | Resource list and cached per-file totals | `library.json` in the repository; live per-file totals are read from Abacus |
-| Shared site-wide visitor/download totals, and the per-student and per-student-file download counters | Abacus counter API (`petgabs-github-io-madv` namespace; no key required — keys are hashes, never names or filenames) |
+| Shared site-wide page-view/download totals (including published Interactive HTML opens), and the per-student and per-student-file download counters | Abacus counter API (`petgabs-github-io-madv` namespace; no key required — keys are hashes, never names or filenames) |
 | Live student register and detailed activity | Supabase (`madv_students`, `madv_visits`, `madv_downloads`, etc.) — required for online self-registration and cross-device sign-in; passwords stay here, never in GitHub's public mirror |
 | Supabase address (URL + publishable key, both public) | `data/sync-config.json` in the repository, and cached in each browser |
 | Repository mirror of the register and activity snapshot | `data/cloud-data.json` — names, usernames and counts, **no passwords**; not authoritative for Abacus totals |
