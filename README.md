@@ -298,7 +298,7 @@ sync** to publish counters only.
 | Abacus counters do not move | Check the Abacus status in the admin dashboard and make sure the browser can reach `https://abacus.jasoncameron.dev`. The API may be rate-limited or temporarily unavailable; cached/local counts remain visible. Supabase **Sync now** refreshes student activity, not the Abacus totals. |
 | The repository mirror is empty or stale | Run the **Mirror the shared register** workflow manually (Actions → Run workflow) and check that `ADMIN_USER` / `ADMIN_PASS` match the site's administrator sign-in. |
 | Token rejected (HTTP 401/403) | Create a new fine-grained token with **Contents: Read and write**, save it again. |
-| File too large | Raise *Maximum upload size* in Cloud settings (keep files under ~95 MB; GitHub rejects files over 100 MB). |
+| File too large | The maximum upload is **50 MB per file** (adjustable down to 1 MB in *Cloud settings → Maximum upload size*). Compress the file, split it, or bundle several files into a ZIP. |
 | Wrong password after renaming | Use **Reset password** on the row — it restores the *username + year* rule. |
 
 ## 10. For developers
