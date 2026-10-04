@@ -2,36 +2,26 @@
   "_comment": "Mirror of the shared backend (Supabase), written automatically by .github/workflows/cloud-sync.yml. Public: holds names, usernames and counts, never passwords.",
   "source": "shared-backend",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T12:29:34Z",
+  "updatedAt": "2026-10-04T17:37:51Z",
   "counters": {
-    "day": "2026-10-04",
+    "day": "2026-10-05",
     "daily": {
       "2026-10-04": {
-        "visits": 3,
-        "downloads": 5
+        "visits": 11,
+        "downloads": 15
+      },
+      "2026-10-05": {
+        "visits": 4,
+        "downloads": 14
       }
     },
-    "visits": 3,
-    "downloads": 5,
-    "visitsToday": 3,
-    "downloadsToday": 5,
-    "uniqueVisitors": 2
+    "visits": 15,
+    "downloads": 29,
+    "visitsToday": 4,
+    "downloadsToday": 14,
+    "uniqueVisitors": 4
   },
   "students": [
-    {
-      "id": "6202f1b3-67e0-4b6c-8bc3-af877289fa9b",
-      "year": "Year 12",
-      "notes": "",
-      "status": "active",
-      "clientId": "stu_mutowja573sd2j",
-      "username": "peter",
-      "firstName": "Peter",
-      "lastVisit": "2026-10-04T10:40:59Z",
-      "visitCount": 0,
-      "registeredAt": "2026-10-04T10:40:59Z",
-      "downloadCount": 0,
-      "passwordRule": "username + year number (kept in the shared backend)"
-    },
     {
       "id": "9645e423-e6f0-4f97-b6f1-bf7d30cd6472",
       "year": "Year 11",
@@ -40,14 +30,162 @@
       "clientId": "stu_mutr1rxledhcqy",
       "username": "liam",
       "firstName": "Liam",
-      "lastVisit": "2026-10-04T11:41:30Z",
-      "visitCount": 0,
+      "lastVisit": "2026-10-04T17:15:14Z",
+      "visitCount": 3,
       "registeredAt": "2026-10-04T11:41:03Z",
-      "downloadCount": 1,
+      "downloadCount": 4,
+      "passwordRule": "username + year number (kept in the shared backend)"
+    },
+    {
+      "id": "d958348b-effe-40d0-a658-618a0a4419dc",
+      "year": "Year 10",
+      "notes": "",
+      "status": "active",
+      "clientId": "stu_mutw6myu2cgd5o",
+      "username": "christine",
+      "firstName": "Christine",
+      "lastVisit": "2026-10-04T17:14:14Z",
+      "visitCount": 5,
+      "registeredAt": "2026-10-04T14:04:49Z",
+      "downloadCount": 11,
+      "passwordRule": "username + year number (kept in the shared backend)"
+    },
+    {
+      "id": "12f1ba58-f7a6-4481-82ad-a0d8141d81f9",
+      "year": "Year 9",
+      "notes": "",
+      "status": "active",
+      "clientId": "stu_mutzz7j5ibsuqq",
+      "username": "james",
+      "firstName": "James",
+      "lastVisit": "2026-10-04T16:38:41Z",
+      "visitCount": 2,
+      "registeredAt": "2026-10-04T15:51:00Z",
+      "downloadCount": 9,
       "passwordRule": "username + year number (kept in the shared backend)"
     }
   ],
   "logins": [
+    {
+      "at": "2026-10-04T17:15:01Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Liam",
+      "year": "Year 11",
+      "studentId": "stu_mutr1rxledhcqy"
+    },
+    {
+      "at": "2026-10-04T17:13:16Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Christine",
+      "year": "Year 10",
+      "studentId": "stu_mutw6myu2cgd5o"
+    },
+    {
+      "at": "2026-10-04T16:43:42Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Christine",
+      "year": "Year 10",
+      "studentId": "stu_mutw6myu2cgd5o"
+    },
+    {
+      "at": "2026-10-04T16:41:06Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Liam",
+      "year": "Year 11",
+      "studentId": "stu_mutr1rxledhcqy"
+    },
+    {
+      "at": "2026-10-04T16:39:34Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Christine",
+      "year": "Year 10",
+      "studentId": "stu_mutw6myu2cgd5o"
+    },
+    {
+      "at": "2026-10-04T16:37:59Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "James",
+      "year": "Year 9",
+      "studentId": "stu_mutzz7j5ibsuqq"
+    },
+    {
+      "at": "2026-10-04T15:55:09Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "James",
+      "year": "Year 9",
+      "studentId": "stu_mutzz7j5ibsuqq"
+    },
+    {
+      "at": "2026-10-04T15:54:54Z",
+      "ok": false,
+      "kind": "Wrong password",
+      "name": "James",
+      "year": "Year 9",
+      "studentId": "stu_mutzz7j5ibsuqq"
+    },
+    {
+      "at": "2026-10-04T15:51:00Z",
+      "ok": true,
+      "kind": "Registration",
+      "name": "James",
+      "year": "Year 9",
+      "studentId": "stu_mutzz7j5ibsuqq"
+    },
+    {
+      "at": "2026-10-04T15:09:44Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Christine",
+      "year": "Year 10",
+      "studentId": "stu_mutw6myu2cgd5o"
+    },
+    {
+      "at": "2026-10-04T14:10:16Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Christine",
+      "year": "Year 10",
+      "studentId": "stu_mutw6myu2cgd5o"
+    },
+    {
+      "at": "2026-10-04T14:04:49Z",
+      "ok": true,
+      "kind": "Registration",
+      "name": "Christine",
+      "year": "Year 10",
+      "studentId": "stu_mutw6myu2cgd5o"
+    },
+    {
+      "at": "2026-10-04T14:00:58Z",
+      "ok": true,
+      "kind": "Sign in",
+      "name": "Liam",
+      "year": "Year 11",
+      "studentId": "stu_mutr1rxledhcqy"
+    },
+    {
+      "at": "2026-10-04T14:00:14Z",
+      "ok": false,
+      "kind": "Wrong password",
+      "name": "Liam",
+      "year": "Year 11",
+      "studentId": "stu_mutr1rxledhcqy"
+    },
+    {
+      "at": "2026-10-04T13:59:47Z",
+      "ok": false,
+      "kind": "Wrong password",
+      "name": "Liam",
+      "year": "Year 11",
+      "studentId": "stu_mutr1rxledhcqy"
+    },
     {
       "at": "2026-10-04T11:41:03Z",
       "ok": true,
@@ -66,6 +204,318 @@
     }
   ],
   "downloads": [
+    {
+      "at": "2026-10-04T17:18:23Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": null,
+      "resourceId": "res_mutk2bsr93lowb",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Guest",
+      "studentYear": null
+    },
+    {
+      "at": "2026-10-04T17:14:42Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": "stu_mutr1rxledhcqy",
+      "resourceId": "res_musdpe0cjuawqo",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Liam",
+      "studentYear": "Year 11"
+    },
+    {
+      "at": "2026-10-04T17:13:42Z",
+      "year": "Year 11",
+      "title": "Gosford 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Gosford 2026 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu2wfc0q58opu",
+      "resourceKey": "path:resources/Year 11/Gosford 2026 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T17:13:04Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_musdpe0cjuawqo",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T16:45:31Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_musdpe0cjuawqo",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T16:45:12Z",
+      "year": "Year 11",
+      "title": "Gosford 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Gosford 2026 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_muu1n8xu3qu3bj",
+      "resourceKey": "path:resources/Year 11/Gosford 2026 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T16:44:39Z",
+      "year": "Year 11",
+      "title": "Sydney Boys 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_mutw4iuyw6ig74",
+      "resourceKey": "path:resources/Year 11/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T16:44:11Z",
+      "year": "Year 11",
+      "title": "Knox 2025 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Knox 2025 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_mutjy5znm0jowv",
+      "resourceKey": "path:resources/Year 11/Knox 2025 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T16:43:35Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_musdpe0cjuawqo",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T16:42:02Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": "stu_mutr1rxledhcqy",
+      "resourceId": "res_musdpe0cjuawqo",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Liam",
+      "studentYear": "Year 11"
+    },
+    {
+      "at": "2026-10-04T16:41:27Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": "stu_mutr1rxledhcqy",
+      "resourceId": "res_musdpe0cjuawqo",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Liam",
+      "studentYear": "Year 11"
+    },
+    {
+      "at": "2026-10-04T16:39:24Z",
+      "year": "Year 11",
+      "title": "Knox 2025 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Knox 2025 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_mutjy5znm0jowv",
+      "resourceKey": "path:resources/Year 11/Knox 2025 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T16:38:09Z",
+      "year": "Year 11",
+      "title": "Sydney Boys 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutzz7j5ibsuqq",
+      "resourceId": "res_mutw4iuyw6ig74",
+      "resourceKey": "path:resources/Year 11/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "James",
+      "studentYear": "Year 9"
+    },
+    {
+      "at": "2026-10-04T16:37:38Z",
+      "year": "Year 11",
+      "title": "Gosford 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Gosford 2026 w. sol.pdf",
+      "studentId": "stu_mutzz7j5ibsuqq",
+      "resourceId": "res_muu1n8xu3qu3bj",
+      "resourceKey": "path:resources/Year 11/Gosford 2026 w. sol.pdf",
+      "studentName": "James",
+      "studentYear": "Year 9"
+    },
+    {
+      "at": "2026-10-04T15:58:56Z",
+      "year": "Year 11",
+      "title": "Knox 2025 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Knox 2025 w. sol.pdf",
+      "studentId": "stu_mutzz7j5ibsuqq",
+      "resourceId": "res_mutjy5znm0jowv",
+      "resourceKey": "path:resources/Year 11/Knox 2025 w. sol.pdf",
+      "studentName": "James",
+      "studentYear": "Year 9"
+    },
+    {
+      "at": "2026-10-04T15:57:47Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": "stu_mutzz7j5ibsuqq",
+      "resourceId": "res_musdpe0cjuawqo",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "James",
+      "studentYear": "Year 9"
+    },
+    {
+      "at": "2026-10-04T15:55:37Z",
+      "year": "Year 11",
+      "title": "Gosford 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Gosford 2026 w. sol.pdf",
+      "studentId": "stu_mutzz7j5ibsuqq",
+      "resourceId": "res_mutzyybpj8x3we",
+      "resourceKey": "path:resources/Year 11/Gosford 2026 w. sol.pdf",
+      "studentName": "James",
+      "studentYear": "Year 9"
+    },
+    {
+      "at": "2026-10-04T15:55:13Z",
+      "year": "Year 11",
+      "title": "Sydney Boys 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutzz7j5ibsuqq",
+      "resourceId": "res_mutw4iuyw6ig74",
+      "resourceKey": "path:resources/Year 11/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "James",
+      "studentYear": "Year 9"
+    },
+    {
+      "at": "2026-10-04T15:55:07Z",
+      "year": "Year 11",
+      "title": "Sydney Boys 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutzz7j5ibsuqq",
+      "resourceId": "res_mutw4iuyw6ig74",
+      "resourceKey": "path:resources/Year 11/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "James",
+      "studentYear": "Year 9"
+    },
+    {
+      "at": "2026-10-04T15:50:56Z",
+      "year": "Year 11",
+      "title": "Sydney Boys 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutzz7j5ibsuqq",
+      "resourceId": "res_mutw4iuyw6ig74",
+      "resourceKey": "path:resources/Year 11/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "James",
+      "studentYear": "Year 9"
+    },
+    {
+      "at": "2026-10-04T15:50:53Z",
+      "year": "Year 11",
+      "title": "Gosford 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Gosford 2026 w. sol.pdf",
+      "studentId": "stu_mutzz7j5ibsuqq",
+      "resourceId": "res_mutzyybpj8x3we",
+      "resourceKey": "path:resources/Year 11/Gosford 2026 w. sol.pdf",
+      "studentName": "James",
+      "studentYear": "Year 9"
+    },
+    {
+      "at": "2026-10-04T14:13:05Z",
+      "year": "Year 11",
+      "title": "Sydney Boys 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_mutwclu1p12uo5",
+      "resourceKey": "path:resources/Year 11/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T14:11:52Z",
+      "year": "Year 11",
+      "title": "Knox 2025 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Knox 2025 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_mutjy5znm0jowv",
+      "resourceKey": "path:resources/Year 11/Knox 2025 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
+    {
+      "at": "2026-10-04T14:10:00Z",
+      "year": "Year 11",
+      "title": "Sydney Boys 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_mutw6myu2cgd5o",
+      "resourceId": "res_mutwclu1p12uo5",
+      "resourceKey": "path:resources/Year 11/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "Christine",
+      "studentYear": "Year 10"
+    },
     {
       "at": "2026-10-04T11:40:59Z",
       "year": "Year 12",
@@ -133,6 +583,78 @@
     }
   ],
   "visits": [
+    {
+      "at": "2026-10-04T17:37:15Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T17:18:03Z",
+      "name": "Administrator",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T17:12:53Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T16:27:02Z",
+      "name": "Administrator",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T15:57:43Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T15:51:51Z",
+      "name": "Administrator",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T15:06:58Z",
+      "name": "Administrator",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T14:11:22Z",
+      "name": "Administrator",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T14:07:57Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T13:57:38Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T13:39:03Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T12:58:36Z",
+      "name": "Administrator",
+      "year": null,
+      "studentId": null
+    },
     {
       "at": "2026-10-04T12:07:14Z",
       "name": "Visitor",
