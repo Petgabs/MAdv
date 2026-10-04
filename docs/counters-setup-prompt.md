@@ -6,7 +6,7 @@ inside the chosen fence, including the headings.
 | Prompt | Use it when |
 | --- | --- |
 | **A — Full build** | You want shared visitor and per-file download counters, backed by Supabase, on **any** static site, starting from nothing. |
-| **B — Finish the Supabase switch** | You are working on **this repo** (`Petgabs/MAdv`). The code is already written; only the Supabase project and its configuration are missing. |
+| **B — Finish the Supabase switch** | You are working on **this repo** (`Petgabs/MAdv`). The Abacus visitor/download counters are built in; only the optional Supabase student backend and its configuration may be missing. |
 
 > **Paths in this repo.** The schema is at `backends/supabase/schema.sql`. The
 > public connection settings go in `data/sync-config.json` (fields `url` and
@@ -371,12 +371,12 @@ schema or the sync code.
    `connect-src` must contain `https://*.supabase.co` (it does now; don't remove it).
 6. **Verify.**
    - Cloud settings → **Test connection** reports the registered student count.
-   - Open the Admin dashboard. The status line (`#backend-status-text`) must
-     change from "**shared backend not configured** — registrations, visits and
-     downloads stay on this device" to "**shared backend connected** · synced …".
-     The "File downloads" KPI must say "shared across devices" instead of "this device only".
-   - Open the site in a second browser. The visit count goes up there too, and a download
-     on one device shows up on the other after a reload.
+   - Open the Admin dashboard. The status line (`#backend-status-text`) should
+     report Abacus visitor/download counters separately from the Supabase
+     student backend. Connecting Supabase changes student registration and
+     activity status; Abacus totals are shared regardless of Supabase config.
+   - Open the site in a second browser. A visit and a published-file download
+     should update the shared Abacus totals after the next response/reload.
    - The browser console shows no CSP or 401/404 errors.
    - Optional: run `npm test` locally (schema + e2e tests should pass).
 7. Report the project ref (not the key) and the before/after status text.

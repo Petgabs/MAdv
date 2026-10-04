@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { splitStatements } from '../../tests/sql-split.mjs';
 
 const sql = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
+const testDay = new Date().toISOString().slice(0, 10);
 
 const db = await PGlite.create();
 // Supabase pre-creates these roles; emulate them so the grant/revoke block runs.
@@ -65,25 +66,25 @@ let l4 = await rpc('public.madv_login', { a: 'PETER', b: 'peter11' });
 check('username is case-insensitive', l4.ok === true, l4);
 
 console.log('\n4. visitor counter');
-let v1 = await rpc('public.madv_visit', { a: 'dev_one', b: '2026-10-04', c: null, d: 'Visitor', e: '' });
+let v1 = await rpc('public.madv_visit', { a: 'dev_one', b: testDay, c: null, d: 'Visitor', e: '' });
 check('first visit counted', v1.ok === true && v1.visits === 1 && v1.uniqueVisitors === 1, v1);
-let v2 = await rpc('public.madv_visit', { a: 'dev_one', b: '2026-10-04', c: null, d: 'Visitor', e: '' });
+let v2 = await rpc('public.madv_visit', { a: 'dev_one', b: testDay, c: null, d: 'Visitor', e: '' });
 check('refresh within 30 min is not double counted', v2.ok === true && v2.duplicate === true && v2.visits === 1, v2);
-let v3 = await rpc('public.madv_visit', { a: 'dev_two', b: '2026-10-04', c: null, d: 'Visitor', e: '' });
+let v3 = await rpc('public.madv_visit', { a: 'dev_two', b: testDay, c: null, d: 'Visitor', e: '' });
 check('second device counted', v3.ok === true && v3.visits === 2 && v3.uniqueVisitors === 2, v3);
-let v4 = await rpc('public.madv_visit', { a: 'dev_one', b: '2026-10-04', c: 'stu_aaaaaaaa', d: 'Peter', e: 'Year 11' });
+let v4 = await rpc('public.madv_visit', { a: 'dev_one', b: testDay, c: 'stu_aaaaaaaa', d: 'Peter', e: 'Year 11' });
 check('a student on a seen device still counts', v4.ok === true && v4.visits === 3, v4);
-let v5 = await rpc('public.madv_visit', { a: '', b: '2026-10-04' });
+let v5 = await rpc('public.madv_visit', { a: '', b: testDay });
 check('blank device id rejected', v5.ok === false, v5);
 let v6 = await rpc('public.madv_visit', { a: 'dev_three', b: 'not-a-day' });
 check('bad day rejected', v6.ok === false, v6);
 
 console.log('\n5. download counter');
-let d1 = await rpc('public.madv_download', { a: 'evt_0001', b: 'path:Year 12/a.pdf', c: JSON.stringify({ day: '2026-10-04', studentId: 'stu_aaaaaaaa', studentName: 'Peter', fileName: 'a.pdf' }) });
+let d1 = await rpc('public.madv_download', { a: 'evt_0001', b: 'path:Year 12/a.pdf', c: JSON.stringify({ day: testDay, studentId: 'stu_aaaaaaaa', studentName: 'Peter', fileName: 'a.pdf' }) });
 check('download counted', d1.ok === true && d1.total === 1 && d1.resourceTotal === 1, d1);
-let d2 = await rpc('public.madv_download', { a: 'evt_0001', b: 'path:Year 12/a.pdf', c: JSON.stringify({ day: '2026-10-04' }) });
+let d2 = await rpc('public.madv_download', { a: 'evt_0001', b: 'path:Year 12/a.pdf', c: JSON.stringify({ day: testDay }) });
 check('retry with the same event id is idempotent', d2.ok === true && d2.duplicate === true && d2.total === 1, d2);
-let d3 = await rpc('public.madv_download', { a: 'evt_0002', b: 'path:Year 12/a.pdf', c: JSON.stringify({ day: '2026-10-04' }) });
+let d3 = await rpc('public.madv_download', { a: 'evt_0002', b: 'path:Year 12/a.pdf', c: JSON.stringify({ day: testDay }) });
 check('second download of the same file', d3.ok === true && d3.total === 2 && d3.resourceTotal === 2, d3);
 let d4 = await rpc('public.madv_download', { a: 'evt_0003', b: 'path:Year 12/b.pdf', c: '{}' });
 check('different file keeps its own total', d4.ok === true && d4.resourceTotal === 1, d4);
@@ -96,8 +97,8 @@ check('visits total', s.visits === 3, s.visits);
 check('downloads total', s.downloads === 3, s.downloads);
 check('unique visitors', s.uniqueVisitors === 2, s.uniqueVisitors);
 check('per-file totals', s.perFile['path:Year 12/a.pdf'].total === 2 && s.perFile['path:Year 12/b.pdf'].total === 1, s.perFile);
-check('daily bucket visits', s.daily['2026-10-04'].visits === 3, s.daily);
-check('daily bucket downloads (one event fell back to the server day)', s.daily['2026-10-04'].downloads === 2 && s.daily['2026-10-03'].downloads === 1, s.daily);
+check('daily bucket visits', s.daily[testDay].visits === 3, s.daily);
+check('daily bucket downloads (fallback uses the current UTC day)', s.daily[testDay].downloads === 3, s.daily);
 
 console.log('\n7. admin export is gated');
 let e0 = await rpc('public.madv_admin_export', { a: 'peter82', b: 'nope' });
@@ -108,8 +109,8 @@ check('export has 3 students', Array.isArray(e1.students) && e1.students.length 
 check('export carries counters', e1.counters.visits === 3 && e1.counters.downloads === 3, e1.counters);
 check('export has login log', Array.isArray(e1.logins) && e1.logins.length >= 5, e1.logins && e1.logins.length);
 check('export has download log', Array.isArray(e1.downloads) && e1.downloads.length === 3, e1.downloads && e1.downloads.length);
-let e2 = await rpc('public.madv_admin_export', { a: 'peter82', b: 'petgabs82', c: '2026-10-04' });
-check('export honours the caller day', e2.counters.day === '2026-10-04' && e2.counters.visitsToday === 3 && e2.counters.downloadsToday === 2, e2.counters);
+let e2 = await rpc('public.madv_admin_export', { a: 'peter82', b: 'petgabs82', c: testDay });
+check('export honours the caller day', e2.counters.day === testDay && e2.counters.visitsToday === 3 && e2.counters.downloadsToday === 3, e2.counters);
 check('exported students never leak to a bad password', e0.students === undefined, e0);
 
 console.log('\n8. admin can block and edit a student');

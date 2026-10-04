@@ -10,8 +10,8 @@
 <meta name="color-scheme" content="light">
 <!-- Static, single-file deployment. Everything the page needs is inline, so the
      only external hosts allowed are the ones used for cloud publishing,
-     file previews and Office/PDF rendering. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com https://cdn.jsdelivr.net; font-src 'self' data:; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://cdn.jsdelivr.net https://*.supabase.co data: blob:; frame-src 'self' blob: data: https://raw.githubusercontent.com https://cdn.jsdelivr.net https://view.officeapps.live.com https://mozilla.github.io https://docs.google.com; worker-src 'none'; form-action 'none'">
+     anonymous Abacus counters, file previews and Office/PDF rendering. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com https://cdn.jsdelivr.net; font-src 'self' data:; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://cdn.jsdelivr.net https://*.supabase.co https://abacus.jasoncameron.dev data: blob:; frame-src 'self' blob: data: https://raw.githubusercontent.com https://cdn.jsdelivr.net https://view.officeapps.live.com https://mozilla.github.io https://docs.google.com; worker-src 'none'; form-action 'none'">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='16' y='23' font-family='Segoe UI,Arial' font-size='17' font-weight='700' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
 
 <style>
@@ -1243,7 +1243,7 @@ table.data th.num{text-align:right}
             <p>Visits over the last 14 days, and downloads broken down by year level, resource type and topic.</p>
           </div>
           <button type="button" class="btn btn--subtle btn--sm" data-action="reset-counters">
-            <svg class="ico ico--sm" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Reset counters
+            <svg class="ico ico--sm" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Reset local charts
           </button>
         </div>
         <div class="panel__body">
@@ -1533,7 +1533,7 @@ table.data th.num{text-align:right}
         <div class="notice notice--warn mb-6">
           <svg class="ico ico--sm" aria-hidden="true"><use href="#i-shield-check"/></svg>
           <div>
-            <b>How sharing works:</b> a browser can never write to GitHub by itself, so it talks to the shared Supabase backend below using the publishable key — that makes registration, sign-in, the visitor counter and the download counter identical on every device. A GitHub Action then mirrors the shared register into <code>data/cloud-data.json</code>, so the repository holds the class list too. The GitHub token saved here only publishes files; it is never shared with visitors.
+            <b>How sharing works:</b> shared visitor and file-download totals use the public Abacus counter API, so they work without a key or a server in this repository. Supabase below is optional and handles student registration, sign-in and the detailed student activity log. A GitHub Action can mirror the shared register into <code>data/cloud-data.json</code>. The GitHub token saved here only publishes files; it is never shared with visitors.
           </div>
         </div>
 
@@ -1643,11 +1643,13 @@ table.data th.num{text-align:right}
           <div class="panel__head">
             <div>
               <h3 id="sync-heading">Shared cloud sync <span class="tag tag--emerald">Supabase</span></h3>
-              <p>Share student registration, sign-in, the visitor counter and the download counter across every device.</p>
+              <p>Optionally share student registration, sign-in and the detailed student activity log. Site-wide visitor and file-download totals use Abacus independently.</p>
             </div>
             <span class="tag" id="sync-status">Not configured</span>
           </div>
           <div class="panel__body">
+            <div class="notice notice--ok mb-4" id="abacus-settings-status" role="status">Visitor and file-download counters use Abacus automatically; no key is required.</div>
+            <p class="hint mb-4">Published resources have their own shared Abacus download total. Device-only uploads are not sent to the counter service. Abacus is public and approximate, so do not use it for private analytics.</p>
             <div class="field-row">
               <div class="field">
                 <label for="sync-url">Supabase project URL</label>
@@ -1659,7 +1661,7 @@ table.data th.num{text-align:right}
               </div>
             </div>
             <p class="hint">Only the <b>publishable</b> key (<code>sb_publishable_…</code> or the legacy anon JWT) belongs here — it is designed to be public because Row Level Security blocks direct table access and only the <code>madv_*</code> functions are exposed. Never paste a <code>sb_secret_…</code> key or a GitHub token. Saving writes just the URL and key to <code>data/sync-config.json</code>, so every device connects automatically.</p>
-            <label class="switch mt-3"><input type="checkbox" id="opt-sync-enabled"><span class="switch__track"></span> Use the shared backend on this device (register, sign in and count from anywhere)</label>
+            <label class="switch mt-3"><input type="checkbox" id="opt-sync-enabled"><span class="switch__track"></span> Use the shared backend on this device (register and sign in from anywhere; sync student activity)</label>
             <label class="switch"><input type="checkbox" id="opt-sync-roster"><span class="switch__track"></span> Let the repository mirror keep student names and usernames (never passwords)</label>
             <div class="row row--wrap mt-3">
               <button type="button" class="btn btn--dark" data-action="save-sync">
@@ -1897,6 +1899,7 @@ var KEYS = {
   tree: 'madv.tree.v2',
   token: 'madv.token.v2',
   pendingSync: 'madv.pending-sync.v1',
+  pendingAbacus: 'madv.abacus-pending.v1',
   syncConfig: 'madv.sync-config.v1'
 };
 var DEFAULT_SETTINGS = {
@@ -1984,6 +1987,9 @@ var state = {
            lastSync: null, online: true, error: '', checked: false, login: '' },
   sync: { provider: 'supabase', url: '', key: '', loaded: false, loading: null, status: 'off',
           lastSync: null, rosterAt: null, error: '', pending: 0, flushing: false, fromRepo: false },
+  abacus: { status: 'checking', lastSync: null, error: '', pending: 0, loading: null, flushing: false,
+            initialized: { visits: false, downloads: false, files: {} }, inFlight: { visits: 0, downloads: 0, files: {} },
+            fileTotals: {}, fileLoads: {}, fileFetchedAt: {} },
   filters: { query: '', year: '', topic: '', category: '', kind: '', sort: 'newest' },
   studentsFilter: { query: '', year: '', status: '', sort: 'recent' },
   filesFilter: { year: '', category: '' },
@@ -2212,6 +2218,285 @@ function currentAdmin() { return state.session && state.session.role === 'admin'
 function isTeacher() { return currentAdmin() || (state.session && state.session.role === 'teacher'); }
 function canUpload() { return currentAdmin(); }
 
+/* Shared site counters use Abacus, a public integer-counter API. The namespace
+   is deliberately stable for this site; resource paths are hashed into short,
+   URL-safe keys so filenames and student data are never sent to Abacus. */
+var ABACUS_BASE_URL = 'https://abacus.jasoncameron.dev';
+var ABACUS_NAMESPACE = 'petgabs-github-io-madv';
+var ABACUS_TIMEOUT_MS = 8000;
+var ABACUS_HIT_GAP_MS = 450;
+var ABACUS_REFRESH_MS = 60 * 1000;
+var ABACUS_FILE_REFRESH_MS = 5 * 60 * 1000;
+var ABACUS_FILE_LOOKUP_GAP_MS = 450;
+var ABACUS_QUEUE_MAX = 200;
+
+function abacusResourceCounterKey(itemOrStableKey) {
+  var stableKey = typeof itemOrStableKey === 'string' ? itemOrStableKey : counterResourceKey(itemOrStableKey);
+  if (!stableKey) return '';
+  var h1 = 2166136261, h2 = 0x9e3779b9;
+  for (var i = 0; i < stableKey.length; i++) {
+    var code = stableKey.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 16777619);
+    h2 = Math.imul(h2 ^ code, 2246822519);
+    h2 ^= h2 >>> 13;
+  }
+  function hex32(value) { return ('00000000' + (value >>> 0).toString(16)).slice(-8); }
+  return 'file-' + hex32(h1) + hex32(h2);
+}
+function abacusRequest(action, key) {
+  key = String(key || '');
+  if ((action !== 'get' && action !== 'hit') || !/^[A-Za-z0-9_.-]{3,64}$/.test(key)) {
+    return Promise.reject(new Error('Invalid Abacus counter key.'));
+  }
+  var url = ABACUS_BASE_URL + '/' + action + '/' + encodeURIComponent(ABACUS_NAMESPACE) + '/' + encodeURIComponent(key);
+  var controller = typeof AbortController === 'function' ? new AbortController() : null;
+  var timer = controller ? setTimeout(function () { controller.abort(); }, ABACUS_TIMEOUT_MS) : null;
+  function clearTimer(value) { if (timer) clearTimeout(timer); return value; }
+  return fetch(url, {
+    method: 'GET', mode: 'cors', credentials: 'omit', cache: 'no-store',
+    signal: controller ? controller.signal : undefined
+  }).then(function (res) {
+    return res.text().then(function (text) {
+      var data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (err) {}
+      if (action === 'get' && res.status === 404) return 0;
+      if (!res.ok) {
+        var failed = new Error('Abacus returned HTTP ' + res.status + (data && data.error ? ': ' + data.error : '.'));
+        failed.status = res.status;
+        throw failed;
+      }
+      var value = data && Number(data.value);
+      if (!Number.isFinite(value) || value < 0) throw new Error('Abacus returned an invalid counter value.');
+      return Math.floor(value);
+    });
+  }).catch(function (err) {
+    if (err && err.status) throw err;
+    if (err && err.name === 'AbortError') throw new Error('Abacus did not answer in time.');
+    throw new Error(err && err.message ? err.message : 'Abacus could not be reached.');
+  }).then(clearTimer, function (err) { clearTimer(); throw err; });
+}
+function abacusQueue() {
+  var queue = store.get(KEYS.pendingAbacus, []);
+  return Array.isArray(queue) ? queue : [];
+}
+function abacusQueueSave(queue) {
+  queue = (queue || []).slice(-ABACUS_QUEUE_MAX);
+  store.set(KEYS.pendingAbacus, queue);
+  state.abacus.pending = queue.length;
+  return queue;
+}
+function abacusQueuedCount(kind, key) {
+  return abacusQueue().filter(function (entry) {
+    return entry.kind === kind && (!key || entry.key === key);
+  }).length;
+}
+function abacusQueueHit(key, kind) {
+  var queue = abacusQueue();
+  if (queue.length >= ABACUS_QUEUE_MAX) return false;
+  queue.push({ key: key, kind: kind, at: new Date().toISOString() });
+  abacusQueueSave(queue);
+  return true;
+}
+function queueOfflineAbacusHit(key, kind) {
+  if (!abacusQueueHit(key, kind)) {
+    abacusSetError(new Error('The offline Abacus counter queue is full.'));
+    return null;
+  }
+  state.abacus.status = 'offline';
+  state.abacus.error = '';
+  state.abacus.pending = abacusQueue().length;
+  renderCounterViews();
+  return null;
+}
+function abacusSetError(err, silent) {
+  state.abacus.status = navigator.onLine === false ? 'offline' : 'error';
+  state.abacus.error = err && err.message ? err.message : 'Abacus counters could not be reached.';
+  state.abacus.pending = abacusQueue().length;
+  if (!silent) renderCounterViews();
+}
+function abacusMarkConnected() {
+  state.abacus.status = 'ok';
+  state.abacus.error = '';
+  state.abacus.lastSync = new Date().toISOString();
+  state.abacus.pending = abacusQueue().length;
+}
+function applyAbacusTotal(kind, value, exact) {
+  var initialized = !!state.abacus.initialized[kind];
+  var current = Number(state.counters[kind]) || 0;
+  var inFlight = Number(state.abacus.inFlight[kind]) || 0;
+  var authoritative = value + abacusQueuedCount(kind);
+  state.counters[kind] = !initialized || (exact && !inFlight) ? authoritative : Math.max(current, authoritative);
+  state.abacus.initialized[kind] = true;
+  saveCounters();
+}
+function applyAbacusFileTotal(item, key, value, exact) {
+  var initialized = !!state.abacus.initialized.files[key];
+  var current = Number(state.abacus.fileTotals[key]) || 0;
+  var inFlight = Number(state.abacus.inFlight.files[key]) || 0;
+  var authoritative = value + abacusQueuedCount('file', key);
+  var total = !initialized || (exact && !inFlight) ? authoritative : Math.max(current, authoritative);
+  state.abacus.fileTotals[key] = total;
+  state.abacus.initialized.files[key] = true;
+  if (!item) item = state.resources.filter(function (resource) { return abacusResourceCounterKey(resource) === key; })[0];
+  if (item && Number(item.downloads || 0) !== total) {
+    item.downloads = total;
+    saveResources();
+  }
+}
+function loadAbacusTotals(force) {
+  if (state.abacus.loading) return state.abacus.loading;
+  if (navigator.onLine === false) {
+    abacusSetError(new Error('The browser is offline; showing cached counter totals.'));
+    return Promise.resolve(false);
+  }
+  if (!force && state.abacus.status === 'ok' && state.abacus.lastSync &&
+      Date.now() - new Date(state.abacus.lastSync).getTime() < ABACUS_REFRESH_MS) return Promise.resolve(true);
+  state.abacus.status = 'checking';
+  var request = Promise.all([
+    abacusRequest('get', 'visits'),
+    abacusRequest('get', 'downloads')
+  ]).then(function (values) {
+    applyAbacusTotal('visits', values[0], true);
+    applyAbacusTotal('downloads', values[1], true);
+    abacusMarkConnected();
+    renderCounterViews();
+    return true;
+  }).catch(function (err) {
+    abacusSetError(err);
+    return false;
+  }).then(function (result) {
+    state.abacus.loading = null;
+    return result;
+  });
+  state.abacus.loading = request;
+  return request;
+}
+function changeAbacusInFlight(key, kind, delta) {
+  if (kind === 'file') {
+    state.abacus.inFlight.files[key] = Math.max(0, (state.abacus.inFlight.files[key] || 0) + delta);
+  } else {
+    state.abacus.inFlight[kind] = Math.max(0, (state.abacus.inFlight[kind] || 0) + delta);
+  }
+}
+function applyAbacusHit(key, kind, value) {
+  if (kind === 'file') {
+    applyAbacusFileTotal(null, key, value);
+    state.abacus.fileFetchedAt[key] = Date.now();
+  } else applyAbacusTotal(kind, value);
+  abacusMarkConnected();
+  renderCounterViews();
+}
+function abacusIncrementCounter(key, kind) {
+  if (navigator.onLine === false) return Promise.resolve(queueOfflineAbacusHit(key, kind));
+  return loadAbacusTotals().then(function () {
+    if (navigator.onLine === false) return queueOfflineAbacusHit(key, kind);
+    changeAbacusInFlight(key, kind, 1);
+    return abacusRequest('hit', key).then(function (value) {
+      applyAbacusHit(key, kind, value);
+      return value;
+    }).catch(function (err) {
+      // Abacus /hit is not idempotent. Do not retry an ambiguous network error:
+      // it may have counted successfully even if the response was lost.
+      abacusSetError(err);
+      renderCounterViews();
+      return null;
+    }).then(function (value) {
+      changeAbacusInFlight(key, kind, -1);
+      return value;
+    });
+  });
+}
+function countAbacusVisit() {
+  return abacusIncrementCounter('visits', 'visits');
+}
+function countAbacusDownload(item) {
+  var stableKey = counterResourceKey(item);
+  if (!stableKey) return Promise.resolve(null); // device-only or unkeyable files stay local
+  return Promise.all([
+    abacusIncrementCounter('downloads', 'downloads'),
+    abacusIncrementCounter(abacusResourceCounterKey(stableKey), 'file')
+  ]);
+}
+function abacusFlushQueue() {
+  if (state.abacus.flushing || navigator.onLine === false) return Promise.resolve(0);
+  var sent = 0, attempted = 0;
+  state.abacus.flushing = true;
+  function next() {
+    if (!abacusQueue().length || navigator.onLine === false) return Promise.resolve(sent);
+    var wait = attempted ? new Promise(function (resolve) { setTimeout(resolve, ABACUS_HIT_GAP_MS); }) : Promise.resolve();
+    return wait.then(function () {
+      if (navigator.onLine === false) return sent;
+      var queue = abacusQueue();
+      if (!queue.length) return sent;
+      var entry = queue[0];
+      // Remove before sending. A lost response must not make a non-idempotent hit repeat.
+      abacusQueueSave(queue.slice(1));
+      changeAbacusInFlight(entry.key, entry.kind, 1);
+      attempted++;
+      var failed = false;
+      return abacusRequest('hit', entry.key).then(function (value) {
+        applyAbacusHit(entry.key, entry.kind, value);
+        sent++;
+      }).catch(function (err) {
+        failed = true;
+        abacusSetError(err, true);
+      }).then(function () {
+        changeAbacusInFlight(entry.key, entry.kind, -1);
+        // A failed hit has an uncertain result. Drop only that entry and leave
+        // the remaining queue for a later connection attempt.
+        return failed ? sent : next();
+      });
+    });
+  }
+  return next().then(function (count) {
+    state.abacus.flushing = false;
+    state.abacus.pending = abacusQueue().length;
+    renderCounterViews();
+    return count;
+  }, function () {
+    state.abacus.flushing = false;
+    state.abacus.pending = abacusQueue().length;
+    renderCounterViews();
+    return 0;
+  });
+}
+function syncAbacusFileTotals(force) {
+  return loadAbacusTotals().then(function (connected) {
+    if (!connected || navigator.onLine === false) return false;
+    var jobs = [];
+    var chain = Promise.resolve();
+    state.resources.forEach(function (item) {
+      var key = abacusResourceCounterKey(item);
+      if (!key || item.source === 'device') return;
+      if (state.abacus.fileLoads[key]) { jobs.push(state.abacus.fileLoads[key]); return; }
+      var fetchedAt = Number(state.abacus.fileFetchedAt[key]) || 0;
+      if (!force && fetchedAt && Date.now() - fetchedAt < ABACUS_FILE_REFRESH_MS) return;
+      var task = chain.then(function () {
+        return new Promise(function (resolve) { setTimeout(resolve, ABACUS_FILE_LOOKUP_GAP_MS); });
+      }).then(function () {
+        return abacusRequest('get', key);
+      }).then(function (value) {
+        applyAbacusFileTotal(item, key, value, true);
+        state.abacus.fileFetchedAt[key] = Date.now();
+      }).catch(function (err) {
+        state.abacus.fileFetchedAt[key] = Date.now();
+        abacusSetError(err, true);
+      }).then(function () {
+        delete state.abacus.fileLoads[key];
+        return true;
+      });
+      state.abacus.fileLoads[key] = task;
+      jobs.push(task);
+      chain = task;
+    });
+    return Promise.all(jobs).then(function () {
+      saveResources();
+      renderCounterViews();
+      return true;
+    });
+  });
+}
+
 function deviceId() {
   var id = store.get(KEYS.device, null);
   if (!id) {
@@ -2266,13 +2551,15 @@ function recordVisit() {
     logEvent('visits', { at: at, studentId: null, name: state.session && state.session.role === 'admin' ? 'Administrator' : 'Visitor', year: '' });
   }
   saveCounters();
-  // Mirror the visit to the shared counter. The configuration is loaded here
-  // as well so the very first visit of a session is still counted.
+  // Abacus counts site-wide visits independently of the optional student backend.
+  var abacusEvent = countAbacusVisit();
+  // Keep the Supabase activity log and per-student visit history when configured.
   if (repoParts()) {
     loadSyncConfig().then(function () { return syncVisit(); }).catch(function () { /* offline */ });
   } else {
     syncVisit();
   }
+  return abacusEvent;
 }
 
 function logEvent(bucket, entry) {
@@ -2297,8 +2584,13 @@ function recordDownload(item, student) {
     studentName: student ? student.firstName : 'Guest',
     studentYear: student ? student.year : ''
   };
-  state.counters.downloads = (state.counters.downloads || 0) + 1;
-  state.counters.downloadsToday = (state.counters.downloadsToday || 0) + 1;
+  var sharedResourceKey = counterResourceKey(item);
+  // Abacus only tracks published, stable-key resources. Device-only uploads
+  // stay entirely local and are not included in shared download totals.
+  if (sharedResourceKey) {
+    state.counters.downloads = (state.counters.downloads || 0) + 1;
+    state.counters.downloadsToday = (state.counters.downloadsToday || 0) + 1;
+  }
   item.downloads = (item.downloads || 0) + 1;
   item.lastDownloadAt = at;
   if (student) {
@@ -2313,6 +2605,7 @@ function recordDownload(item, student) {
   saveResources();
   saveCounters();
   maybePushAnalytics();
+  return countAbacusDownload(item);
 }
 
 /* ------------------------------ 5. Students ------------------------------- */
@@ -2620,10 +2913,10 @@ function cloudDataUrl() {
    publish because Row Level Security blocks direct table access and only the
    madv_* functions below are exposed.
 
-   That backend makes registration, sign-in, the visitor counter and the
-   download counter shared across every device. A GitHub Action (or the admin
-   browser) then mirrors the shared register into data/cloud-data.json, so the
-   repository always holds the class list as well.
+   That backend makes registration, sign-in, student records and detailed
+   activity logs shared across every device. The site-wide visitor and file
+   download totals are handled separately by Abacus. A GitHub Action (or the
+   admin browser) can mirror the shared register into data/cloud-data.json.
    ---------------------------------------------------------------------- */
 var SYNC_TIMEOUT_MS = 12000;
 var SYNC_QUEUE_MAX = 200;
@@ -3167,8 +3460,8 @@ function newCounterEventId(prefix) {
 function applySyncStats(stats) {
   if (!stats || stats.ok !== true) return;
   rollDay();
-  if (typeof stats.visits === 'number') state.counters.visits = Math.max(state.counters.visits || 0, stats.visits);
-  if (typeof stats.downloads === 'number') state.counters.downloads = Math.max(state.counters.downloads || 0, stats.downloads);
+  // The all-time site totals are authoritative in Abacus. Supabase remains
+  // useful for unique devices, daily analytics and the student activity log.
   if (typeof stats.uniqueVisitors === 'number') state.counters.uniqueVisitors = Math.max(state.counters.uniqueVisitors || 0, stats.uniqueVisitors);
   if (stats.daily && typeof stats.daily === 'object') {
     Object.keys(stats.daily).forEach(function (day) {
@@ -3189,8 +3482,7 @@ function applySyncStats(stats) {
       var key = counterResourceKey(item);
       var record = key && stats.perFile[key];
       if (!record) return;
-      var total = Number.isFinite(Number(record.total)) ? Number(record.total) : null;
-      if (total !== null && (item.downloads || 0) !== total) { item.downloads = total; changed = true; }
+      // Abacus owns the public per-file total; Supabase supplies activity timing.
       if (record.lastDownloadAt && record.lastDownloadAt !== item.lastDownloadAt) {
         item.lastDownloadAt = record.lastDownloadAt;
         changed = true;
@@ -3202,15 +3494,14 @@ function applySyncStats(stats) {
 }
 function applySyncDownload(data, fallbackKey) {
   if (!data || data.ok !== true) return;
-  state.counters.downloads = Math.max(state.counters.downloads || 0, Number(data.total) || 0);
+  // Supabase keeps the student/download audit log. Abacus owns the shared
+  // all-time and per-file totals shown in the site UI.
   var key = data.resourceKey || fallbackKey;
   var item = key ? state.resources.filter(function (resource) { return counterResourceKey(resource) === key; })[0] : null;
-  if (item) {
-    if (Number.isFinite(Number(data.resourceTotal))) item.downloads = Math.max(0, Number(data.resourceTotal));
-    if (data.lastDownloadAt) item.lastDownloadAt = data.lastDownloadAt;
+  if (item && data.lastDownloadAt) {
+    item.lastDownloadAt = data.lastDownloadAt;
     saveResources();
   }
-  saveCounters();
   state.sync.lastSync = new Date().toISOString();
 }
 
@@ -3553,9 +3844,9 @@ function mergeCloudData(remote) {
   if (!remote || typeof remote !== 'object') return 0;
   var added = 0, changed = false;
   var c = remote.counters || {};
-  ['visits', 'downloads', 'visitsToday', 'downloadsToday'].forEach(function (k) {
-    if (typeof c[k] === 'number' && c[k] > (state.counters[k] || 0)) { state.counters[k] = c[k]; changed = true; }
-  });
+  // The public cloud-data snapshot is only a legacy fallback. All-time visitor
+  // and download totals now come from Abacus, so an older snapshot must not
+  // override its live values.
   if (c.day && !state.counters.day) state.counters.day = c.day;
   if (c.daily && typeof c.daily === 'object') {
     Object.keys(c.daily).forEach(function (day) {
@@ -3766,13 +4057,15 @@ function renderCounters() {
     var el = $(pair[0]);
     if (el) el.textContent = formatCount(pair[1]);
   });
+  var abacusPending = state.abacus.pending || abacusQueue().length;
+  var abacusDetail = state.abacus.status === 'ok'
+    ? 'Shared via Abacus' + (state.abacus.lastSync ? ' · synced ' + relativeTime(state.abacus.lastSync) : '')
+    : (state.abacus.status === 'checking' ? 'Connecting to Abacus' : 'Showing cached/local totals — Abacus is unavailable');
+  if (abacusPending) abacusDetail += ' · ' + formatCount(abacusPending) + ' change(s) waiting';
   var pill = $('#visitor-pill');
-  if (pill) pill.title = formatCount(state.counters.uniqueVisitors || 0) + ' unique devices · ' + formatCount(state.counters.visitsToday || 0) + ' visits today';
+  if (pill) pill.title = abacusDetail + ' · ' + formatCount(state.counters.visitsToday || 0) + ' visits today';
   var dpill = $('#download-pill');
-  if (dpill) dpill.title = syncReady()
-    ? 'Shared total from every device · ' + formatCount(state.counters.downloadsToday || 0) + ' downloads today' +
-      (state.sync.lastSync ? ' · synced ' + relativeTime(state.sync.lastSync) : '')
-    : 'This browser only. Connect the shared backend in Cloud settings to combine every device.';
+  if (dpill) dpill.title = abacusDetail + ' · ' + formatCount(state.counters.downloadsToday || 0) + ' downloads today';
 }
 function renderAll() {
   applyVisibility();
@@ -4076,8 +4369,8 @@ function renderDashboard() {
   if (kpis) {
     kpis.innerHTML = [
       kpiHtml('Registered students', formatCount(students.length), formatCount(activeWeek) + ' active in the last 7 days', 'users', 'kpi--indigo'),
-      kpiHtml('Visits', formatCount(state.counters.visits || 0), formatCount(state.counters.visitsToday || 0) + ' today · ' + formatCount(state.counters.uniqueVisitors || 0) + ' devices', 'activity', ''),
-      kpiHtml('File downloads', formatCount(state.counters.downloads || 0), formatCount(state.counters.downloadsToday || 0) + ' today' + (syncReady() ? ' · shared across devices' : ' · this device only') + ' · ' + formatCount(totalStudentDownloads) + ' recorded for students', 'cloud-download', 'kpi--emerald'),
+      kpiHtml('Visits', formatCount(state.counters.visits || 0), 'All-time total shared via Abacus · ' + formatCount(state.counters.visitsToday || 0) + ' visits today', 'activity', ''),
+      kpiHtml('File downloads', formatCount(state.counters.downloads || 0), 'All-time total shared via Abacus · ' + formatCount(state.counters.downloadsToday || 0) + ' today · ' + formatCount(totalStudentDownloads) + ' recorded for students', 'cloud-download', 'kpi--emerald'),
       kpiHtml('Resources', formatCount(state.resources.length), state.resources.filter(function (r) { return r.source === 'cloud'; }).length + ' in the cloud · ' + formatBytes(totalBytes), 'folder', 'kpi--amber'),
       kpiHtml('Students active today', formatCount(activeToday), formatCount(blocked) + ' blocked account' + (blocked === 1 ? '' : 's'), 'user-check', 'kpi--indigo'),
       kpiHtml('Never signed in', formatCount(students.filter(function (s) { return !s.visitCount; }).length), 'Registered but no visit recorded', 'clock', 'kpi--rose')
@@ -4087,21 +4380,30 @@ function renderDashboard() {
   if (statusText) {
     var repo = repoParts();
     var pieces = [];
+    var abacusPending = state.abacus.pending || abacusQueue().length;
+    pieces.push(state.abacus.status === 'ok'
+      ? 'Abacus visitor and download counters connected' + (state.abacus.lastSync ? ' · synced ' + esc(relativeTime(state.abacus.lastSync)) : '')
+      : (state.abacus.status === 'checking'
+        ? 'Connecting shared visitor and download counters to Abacus…'
+        : '<b>Abacus counters unavailable</b> — showing locally cached totals'));
+    if (abacusPending) pieces.push(esc(abacusPending) + ' counter change(s) waiting');
+    if (state.abacus.error) pieces.push('<b>' + esc(state.abacus.error) + '</b>');
     if (repo) {
       pieces.push('Repository <b>' + esc(repo.full) + '</b> (' + esc(state.settings.branch || 'main') + ')');
       pieces.push(currentToken()
         ? 'write token is stored in this browser only'
-        : '<b>read-only on this browser</b> — its registrations and activity stay local');
-      pieces.push(syncReady()
-        ? 'shared backend connected' + (state.sync.lastSync ? ' · synced ' + esc(relativeTime(state.sync.lastSync)) : '') +
-          (state.sync.rosterAt ? ' · register pulled ' + esc(relativeTime(state.sync.rosterAt)) : '')
-        : '<b>shared backend not configured</b> — registrations, visits and downloads stay on this device');
-      if (syncReady() && state.sync.pending) pieces.push(esc(state.sync.pending) + ' change(s) waiting to sync');
-      if (state.sync.error) pieces.push('<b>' + esc(state.sync.error) + '</b>');
-      pieces.push(state.cloud.lastSync ? 'last cloud sync ' + esc(relativeTime(state.cloud.lastSync)) : 'not synced yet');
+        : '<b>read-only on this browser</b> — publishing to GitHub needs an access token');
+      pieces.push(state.cloud.lastSync ? 'last library sync ' + esc(relativeTime(state.cloud.lastSync)) : 'library not synced yet');
     } else {
-      pieces.push('No repository configured — everything is stored in this browser. Add the repository and access token in Cloud settings to publish to the cloud.');
+      pieces.push('No repository configured — Abacus counters remain shared; publishing files requires a repository and access token.');
     }
+    pieces.push(syncReady()
+      ? (state.settings.syncEnabled === false ? 'student backend configured but disabled on this device' : 'student backend configured') +
+        (state.sync.lastSync ? ' · synced ' + esc(relativeTime(state.sync.lastSync)) : '') +
+        (state.sync.rosterAt ? ' · register pulled ' + esc(relativeTime(state.sync.rosterAt)) : '')
+      : '<b>student backend not configured</b> — registration and student activity stay on this device');
+    if (syncReady() && state.sync.pending) pieces.push(esc(state.sync.pending) + ' student change(s) waiting to sync');
+    if (state.sync.error) pieces.push('<b>' + esc(state.sync.error) + '</b>');
     if (state.cloud.error) pieces.push('<b>' + esc(state.cloud.error) + '</b>');
     statusText.innerHTML = pieces.join(' · ');
   }
@@ -4397,6 +4699,18 @@ function renderSettings() {
   $('#data-downloads').textContent = formatCount(state.counters.downloads || 0);
   $('#data-visits').textContent = formatCount(state.counters.visits || 0);
   $('#data-size').textContent = formatBytes(store.size());
+  var abacusStatus = $('#abacus-settings-status');
+  if (abacusStatus) {
+    var pendingAbacus = state.abacus.pending || abacusQueue().length;
+    var abacusText = state.abacus.status === 'ok'
+      ? 'Abacus is connected. Visitor and published-file download totals are shared.' + (state.abacus.lastSync ? ' Last checked ' + relativeTime(state.abacus.lastSync) + '.' : '')
+      : (state.abacus.status === 'checking'
+        ? 'Checking Abacus. Counters work without a Supabase project or API key.'
+        : 'Abacus is unavailable; this browser is showing its cached/local totals.' + (state.abacus.error ? ' ' + state.abacus.error : ''));
+    if (pendingAbacus) abacusText += ' ' + pendingAbacus + ' counter change(s) waiting to send.';
+    abacusStatus.textContent = abacusText;
+    abacusStatus.className = 'notice mb-4 ' + (state.abacus.status === 'ok' ? 'notice--ok' : (state.abacus.status === 'checking' ? 'notice--info' : 'notice--warn'));
+  }
   var syncUrl = $('#sync-url');
   if (syncUrl && !syncUrl.value) syncUrl.value = state.sync.url || '';
   var syncKey = $('#sync-key');
@@ -4421,15 +4735,15 @@ function renderSettings() {
 }
 function syncHintHtml() {
   if (!syncReady()) {
-    return 'Not configured: registrations, visits and downloads stay on each device until the shared backend is connected. ' +
-      'Create the free Supabase project, run <code>backends/supabase/schema.sql</code> and paste the project URL and publishable key above.';
+    return 'Not configured: student registration, sign-in and detailed student activity stay on each device. ' +
+      'The visitor and published-file download totals are still shared through Abacus. To share student accounts, create the free Supabase project, run <code>backends/supabase/schema.sql</code> and paste the project URL and publishable key above.';
   }
   var parts = [];
   parts.push(state.sync.fromRepo ? 'Configuration loaded from <code>data/sync-config.json</code>.' : 'Configuration saved on this device.');
-  if (state.sync.lastSync) parts.push('Counters synced ' + esc(relativeTime(state.sync.lastSync)) + '.');
+  if (state.sync.lastSync) parts.push('Student activity synced ' + esc(relativeTime(state.sync.lastSync)) + '.');
   if (state.sync.rosterAt) parts.push('Register pulled ' + esc(relativeTime(state.sync.rosterAt)) + '.');
-  if (state.sync.pending) parts.push('<b>' + state.sync.pending + ' change(s) waiting for a connection.</b>');
-  parts.push('The GitHub Action mirrors the shared register into <code>data/cloud-data.json</code> every hour.');
+  if (state.sync.pending) parts.push('<b>' + state.sync.pending + ' student change(s) waiting for a connection.</b>');
+  parts.push('Abacus separately shares the site-wide visit and download totals. The GitHub Action mirrors the shared register into <code>data/cloud-data.json</code> every hour.');
   return parts.join(' ');
 }
 function setSwitch(sel, value) {
@@ -4507,8 +4821,8 @@ function importBackupFile(file) {
         });
       }
       if (data.counters && typeof data.counters === 'object') {
-        state.counters.visits = Math.max(state.counters.visits || 0, data.counters.visits || 0);
-        state.counters.downloads = Math.max(state.counters.downloads || 0, data.counters.downloads || 0);
+        // Abacus is authoritative for all-time totals; import only the local
+        // day buckets as a historical fallback.
         Object.keys(data.counters.daily || {}).forEach(function (day) {
           state.counters.daily[day] = Math.max(state.counters.daily[day] || 0, data.counters.daily[day]);
         });
@@ -5067,14 +5381,13 @@ function cloudSyncNow(silent) {
     state.cloud.loading = false;
     state.cloud.lastSync = new Date().toISOString();
     state.cloud.error = '';
-    return syncDownloadCounter(true).then(function () {
-      renderAll();
-      if (!silent) {
-        var info = results[0];
-        toast('Cloud library refreshed' + (info && info.total ? ' — ' + info.total + ' published file(s).' : '.') , 'success');
-      }
-      return results;
-    });
+    syncAbacusFileTotals(false); // per-file Abacus reads are throttled and finish in the background
+    renderAll();
+    if (!silent) {
+      var info = results[0];
+      toast('Cloud library refreshed' + (info && info.total ? ' — ' + info.total + ' published file(s).' : '.') , 'success');
+    }
+    return results;
   }).catch(function (err) {
     state.cloud.loading = false;
     state.cloud.error = err.message;
@@ -5409,7 +5722,7 @@ function openEditResource(id) {
     '<div class="field-row">' +
       '<div class="field"><label for="er-topic">Topic</label><select class="select" id="er-topic">' +
         TOPICS.map(function (t) { return '<option value="' + attr(t) + '"' + (t === r.topic ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="field"><label for="er-downloads">Download counter</label><input class="input" id="er-downloads" type="number" min="0" value="' + (r.downloads || 0) + '"></div>' +
+      '<div class="field"><label for="er-downloads">Abacus download count</label><input class="input" id="er-downloads" type="number" value="' + (r.downloads || 0) + '" readonly><p class="hint">Read-only shared total. Abacus does not allow this page to reset the counter.</p></div>' +
     '</div>' +
     '<label class="check"><input type="checkbox" id="er-visible"' + (r.visible !== false ? ' checked' : '') + '> Show this file to students</label>' +
   '</form>';
@@ -5430,7 +5743,6 @@ function saveResourceEdits(id) {
   r.year = $('#er-year').value;
   r.category = $('#er-category').value;
   r.topic = $('#er-topic').value;
-  r.downloads = Math.max(0, Number($('#er-downloads').value) || 0);
   r.visible = $('#er-visible').checked;
   saveResources();
   closeModal();
@@ -5655,20 +5967,17 @@ var ACTIONS = {
   },
   'reset-counters': function () {
     confirmDialog({
-      title: 'Reset the counters?',
-      message: syncReady()
-        ? 'Visit and download totals return to zero on this device. The shared totals come back on the next sync — reset them in the Supabase dashboard if you need to clear them everywhere.'
-        : 'Visit and download totals return to zero. The activity logs and student histories stay.',
-      confirmLabel: 'Reset counters', danger: true
+      title: 'Reset local analytics?',
+      message: 'This clears only this browser’s daily chart and today totals. The all-time visitor and download totals are shared through Abacus and cannot be reset from this public page.',
+      confirmLabel: 'Reset local charts', danger: true
     }).then(function (ok) {
       if (!ok) return;
-      var devices = state.counters.devices || [];
-      state.counters = defaultCounters();
-      state.counters.devices = devices;
-      state.counters.uniqueVisitors = devices.length;
+      state.counters.daily = {};
+      state.counters.visitsToday = 0;
+      state.counters.downloadsToday = 0;
       saveCounters();
       renderAll();
-      toast('Counters reset.', 'success');
+      toast('Local analytics cleared. Shared Abacus totals are unchanged.', 'success');
     });
   },
   'export-students': function () { exportStudentsCsv(); },
@@ -5891,6 +6200,8 @@ function wireEvents() {
 
   window.addEventListener('online', function () {
     updateConnectionState();
+    abacusFlushQueue().then(function () { return loadAbacusTotals(true); })
+      .then(function () { return syncAbacusFileTotals(true); });
     if (syncReady()) syncQueueFlush();
   });
   window.addEventListener('offline', updateConnectionState);
@@ -5917,6 +6228,11 @@ function refreshRelativeTimes() {
   if (state.view === 'dashboard') { renderStudentTable(); renderFeeds(); renderAnalytics(); renderFilesTable(); }
   else if (state.view === 'my-learning') renderMyLearning();
   renderCounters();
+  if (navigator.onLine !== false) {
+    loadAbacusTotals(false);
+    syncAbacusFileTotals(false);
+    if (abacusQueue().length) abacusFlushQueue();
+  }
   if (syncReady() && state.cloud.online !== false && navigator.onLine !== false) syncQueueFlush();
 }
 function init() {
@@ -5942,6 +6258,13 @@ function init() {
   wireEvents();
   fillStaticOptions();
   updateConnectionState();
+  state.abacus.pending = abacusQueue().length;
+  // Start the shared Abacus read before recording this page's visit so the
+  // returned remote total becomes the baseline rather than being overwritten.
+  var initialAbacusSync = loadAbacusTotals().then(function (connected) {
+    if (connected && abacusQueue().length) return abacusFlushQueue();
+    return 0;
+  });
 
   var lastVisit = store.get('madv.lastVisitAt', 0);
   if (!lastVisit || (Date.now() - Number(lastVisit)) > 30 * 60 * 1000) {
@@ -5961,6 +6284,7 @@ function init() {
   updateUploadMode();
   renderAll();
   showView(state.view || 'library');
+  initialAbacusSync.then(function () { return syncAbacusFileTotals(false); });
 
   if (repoParts()) {
     var startSync = loadSyncConfig().then(function () { return syncQueueFlush(); }).then(function () { return syncStats(); });

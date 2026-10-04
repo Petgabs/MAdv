@@ -1,6 +1,6 @@
 // End-to-end test: load the real index.html in jsdom, point its network calls
-// at the fake Supabase (real Postgres) and at a fake GitHub, then register,
-// sign in, count a visit and a download, and pull the admin register.
+// at fake Supabase, Abacus and GitHub endpoints, then register, sign in, count
+// shared visits and downloads, and pull the admin register.
 import { JSDOM } from 'jsdom';
 import { createBackend } from './fake-supabase.mjs';
 import { readFileSync } from 'node:fs';
@@ -18,6 +18,28 @@ const check = (label, cond, extra) => {
 
 const syncConfig = JSON.stringify({ provider: 'supabase', url: backend.url, publishableKey: 'sb_publishable_test' });
 const githubState = { cloudData: null, syncConfig: null, library: { resources: [] } };
+const abacusState = new Map();
+const abacusFailOnce = new Set();
+function fakeAbacusFetch(url, json) {
+  if (!String(url).startsWith('https://abacus.jasoncameron.dev/')) return null;
+  const parts = new URL(url).pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  const [operation, namespace, key] = parts;
+  const id = namespace + '/' + key;
+  if (operation === 'get') {
+    return json(abacusState.has(id) ? 200 : 404,
+      abacusState.has(id) ? { value: abacusState.get(id) } : { error: 'Key not found' });
+  }
+  if (operation === 'hit') {
+    if (abacusFailOnce.has(id)) {
+      abacusFailOnce.delete(id);
+      return json(503, { error: 'temporarily unavailable' });
+    }
+    const value = (abacusState.get(id) || 0) + 1;
+    abacusState.set(id, value);
+    return json(200, { value });
+  }
+  return json(404, { error: 'Unknown endpoint' });
+}
 
 const dom = new JSDOM(html, {
   runScripts: 'dangerously',
@@ -25,6 +47,8 @@ const dom = new JSDOM(html, {
   pretendToBeVisual: true,
   beforeParse(window) {
     try { Object.defineProperty(window, 'crypto', { value: { randomUUID: () => require('node:crypto').randomUUID(), getRandomValues: (a) => require('node:crypto').randomFillSync(a) }, configurable: true }); } catch (e) {}
+    window.scrollTo = () => {};
+    try { Object.defineProperty(window, 'TextEncoder', { value: TextEncoder, configurable: true }); Object.defineProperty(window, 'TextDecoder', { value: TextDecoder, configurable: true }); } catch (e) {}
     window.fetch = (input, init) => {
       const url = typeof input === 'string' ? input : input.url;
       const opts = init || {};
@@ -32,6 +56,8 @@ const dom = new JSDOM(html, {
         status, ok: status >= 200 && status < 300,
         json: () => Promise.resolve(body), text: () => Promise.resolve(JSON.stringify(body))
       });
+      const abacusResponse = fakeAbacusFetch(url, json);
+      if (abacusResponse) return abacusResponse;
       // GitHub raw / api
       if (url.includes('raw.githubusercontent.com')) {
         if (url.includes('sync-config.json')) return json(githubState.syncConfig === null ? 404 : 200, githubState.syncConfig);
@@ -116,20 +142,34 @@ const other = await secondBrowser();
 await other.window.syncVisit();
 const stats3 = await app.syncStats();
 check('a different device adds a unique visitor', stats3.uniqueVisitors >= 2, stats3.uniqueVisitors);
+await app.loadAbacusTotals(true);
+check('Abacus stores the shared visit total', abacusState.get('petgabs-github-io-madv/visits') >= 2, abacusState.get('petgabs-github-io-madv/visits'));
+check('Abacus connection is visible to the app', app.state.abacus.status === 'ok', app.state.abacus.status);
+await other.window.loadAbacusTotals(true);
+check('a second browser reads the same Abacus total', other.window.state.counters.visits === abacusState.get('petgabs-github-io-madv/visits'), other.window.state.counters.visits);
 
-console.log('\n5. download counter is shared and idempotent');
+console.log('\n5. Abacus total + per-file downloads and Supabase activity log');
 const item = { id: 'res1', title: 'Practice', fileName: 'a.pdf', source: 'cloud', path: 'Year 12/a.pdf', category: 'Homework', topic: 'Functions', year: 'Year 12', downloads: 0 };
 app.state.resources = [item];
-app.recordDownload(item, reg.student);        // the real download path
+await app.recordDownload(item, reg.student);  // the real successful-download path
 await app.syncDownloadEvent(item, reg.student);
 const d1 = await app.syncStats();
-check('download counted', d1.downloads === 1 && d1.perFile['path:Year 12/a.pdf'].total === 1, d1);
-app.recordDownload(item, reg.student);
+check('Supabase records the download for student activity', d1.downloads === 1 && d1.perFile['path:Year 12/a.pdf'].total === 1, d1);
+check('Abacus total download counter increments', abacusState.get('petgabs-github-io-madv/downloads') === 1, abacusState.get('petgabs-github-io-madv/downloads'));
+const abacusFileKey = app.abacusResourceCounterKey(item);
+check('Abacus per-file counter increments', abacusState.get('petgabs-github-io-madv/' + abacusFileKey) === 1, abacusFileKey);
+await app.recordDownload(item, reg.student);
 await app.syncDownloadEvent(item, reg.student);
 const d2 = await app.syncStats();
-check('second download of the same file', d2.downloads === 2 && d2.perFile['path:Year 12/a.pdf'].total === 2, d2);
+check('second download is reflected in Supabase activity', d2.downloads === 2 && d2.perFile['path:Year 12/a.pdf'].total === 2, d2);
+check('Abacus total download counter increments again', abacusState.get('petgabs-github-io-madv/downloads') === 2, abacusState.get('petgabs-github-io-madv/downloads'));
+check('Abacus per-file counter increments again', abacusState.get('petgabs-github-io-madv/' + abacusFileKey) === 2, abacusState.get('petgabs-github-io-madv/' + abacusFileKey));
 check('per-file total mirrored onto the resource', item.downloads === 2, item.downloads);
 check('student download tally grew', app.state.students.filter((s) => s.id === reg.student.id)[0].downloadCount >= 2, app.state.students[0].downloadCount);
+const remoteItem = { id: 'res1', title: 'Practice', fileName: 'a.pdf', source: 'cloud', path: 'Year 12/a.pdf', downloads: 0 };
+other.window.state.resources = [remoteItem];
+await other.window.syncAbacusFileTotals(true);
+check('another browser fetches the same per-file total', remoteItem.downloads === 2, remoteItem.downloads);
 
 console.log('\n6. admin pulls the shared register');
 app.loginAdmin('peter82', 'petgabs82');
@@ -154,7 +194,20 @@ const offline = await secondBrowser({ offline: true });
 const queued = await guard(() => offline.window.registerStudent('Offline', 'Year 11'));
 check('registers locally when offline', queued.shared === false && queued.offline === true, queued);
 check('registration is queued for later', offline.window.syncQueue().length === 1, offline.window.syncQueue().length);
+check('Abacus visit is queued while the browser is offline', offline.window.abacusQueue().some((entry) => entry.key === 'visits'), offline.window.abacusQueue());
 check('local login still works offline', (await guard(() => offline.window.loginStudent('offline', 'offline11'))).username === 'offline');
+const visitsBeforeFlush = abacusState.get('petgabs-github-io-madv/visits') || 0;
+offline.window.__setOffline(false);
+await offline.window.abacusFlushQueue();
+check('offline Abacus hit flushes once on reconnect', abacusState.get('petgabs-github-io-madv/visits') === visitsBeforeFlush + 1, abacusState.get('petgabs-github-io-madv/visits'));
+offline.window.abacusQueueSave([
+  { key: 'visits', kind: 'visits' },
+  { key: 'downloads', kind: 'downloads' }
+]);
+abacusFailOnce.add('petgabs-github-io-madv/visits');
+await offline.window.abacusFlushQueue();
+check('an uncertain failed hit is not retried and later queued hits are preserved',
+  offline.window.abacusQueue().length === 1 && offline.window.abacusQueue()[0].key === 'downloads', offline.window.abacusQueue());
 
 console.log('\n9. saving the configuration writes only public values');
 app.state.settings.dataDir = 'data';
@@ -199,12 +252,17 @@ await backend.close();
 process.exit(fail ? 1 : 0);
 
 async function secondBrowser(options = {}) {
+  let simulatedOffline = !!options.offline;
   const d = new JSDOM(html, {
     runScripts: 'dangerously',
     url: 'https://petgabs.github.io/MAdv/',
     pretendToBeVisual: true,
     beforeParse(w) {
       try { Object.defineProperty(w, 'crypto', { value: { randomUUID: () => require('node:crypto').randomUUID(), getRandomValues: (a) => require('node:crypto').randomFillSync(a) }, configurable: true }); } catch (e) {}
+      w.scrollTo = () => {};
+      try { Object.defineProperty(w, 'TextEncoder', { value: TextEncoder, configurable: true }); Object.defineProperty(w, 'TextDecoder', { value: TextDecoder, configurable: true }); } catch (e) {}
+      try { Object.defineProperty(w.navigator, 'onLine', { get: () => !simulatedOffline, configurable: true }); } catch (e) {}
+      w.__setOffline = (value) => { simulatedOffline = !!value; };
       w.fetch = (input, init) => {
         const url = typeof input === 'string' ? input : input.url;
         const opts = init || {};
@@ -212,13 +270,16 @@ async function secondBrowser(options = {}) {
           status, ok: status >= 200 && status < 300,
           json: () => Promise.resolve(body), text: () => Promise.resolve(JSON.stringify(body))
         });
+        if (simulatedOffline && String(url).startsWith('https://abacus.jasoncameron.dev/')) return Promise.reject(new Error('offline'));
+        const abacusResponse = fakeAbacusFetch(url, json);
+        if (abacusResponse) return abacusResponse;
         if (url.includes('raw.githubusercontent.com')) {
           if (options.noConfig) return json(404, {});
           if (url.includes('sync-config.json')) return json(githubState.syncConfig === null ? 404 : 200, githubState.syncConfig);
           if (url.includes('library.json')) return json(200, githubState.library);
           return json(404, {});
         }
-        if (options.offline) return Promise.reject(new Error('offline'));
+        if (simulatedOffline) return Promise.reject(new Error('offline'));
         return fetch(url.startsWith('http') ? url : backend.url + url, opts);
       };
     }
