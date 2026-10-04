@@ -2224,7 +2224,7 @@ table.data th.num{text-align:right}
 'use strict';
 
 /* ---------------------------- 1. Configuration --------------------------- */
-var APP_VERSION   = 'v2.4.0';
+var APP_VERSION   = 'v2.4.1';
 var SUBJECT       = 'Mathematics Advanced';
 var DEFAULT_ADMIN = { user: 'peter82', pass: 'petgabs82' };
 // One uploaded file is capped at 50 MB. Teachers can lower the limit in Cloud
@@ -2315,7 +2315,8 @@ var KEYS = {
   authLock: 'madv.auth-lock.v1',
   diagnostics: 'madv.diagnostics.v1',
   downloadCache: 'madv.download-cache.v1',
-  messages: 'madv.messages.v1'
+  messages: 'madv.messages.v1',
+  visitSession: 'madv.visit-session.v1'
 };
 var DEFAULT_SETTINGS = {
   repo: '',
@@ -3562,6 +3563,14 @@ function recordStudentVisit(student, at) {
   maybePushAnalytics();
 }
 
+function sessionVisitCounted() {
+  try { return sessionStorage.getItem(KEYS.visitSession) === '1'; } catch (err) { return false; }
+}
+function markSessionVisit() {
+  try { sessionStorage.setItem(KEYS.visitSession, '1'); } catch (err) {}
+}
+// A browser refresh keeps sessionStorage, so it is not a new visit.
+// Closing the tab, opening a new one, or signing in counts as a visit.
 function recordVisit(options) {
   rollDay();
   var id = deviceId();
@@ -3769,9 +3778,9 @@ function loginStudentLocally(u, p, at) {
   logEvent('logins', { at: at, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Sign in' });
   state.session = { role: 'student', studentId: student.id, at: at };
   saveSession();
-  // The page visit was already counted during startup; attribute it to the
-  // signed-in student without incrementing the global visitor total again.
   recordStudentVisit(student, at);
+  // A fresh sign-in is a new visit even if this tab already loaded the site.
+  countAbacusVisit();
   return student;
 }
 // Signs in against the shared register when it is reachable, so the same
@@ -3800,6 +3809,7 @@ function loginStudent(username, password) {
     state.session = { role: 'student', studentId: student.id, at: at };
     saveSession();
     recordStudentVisit(student, at);
+    countAbacusVisit();
     renderAll();
     return student;
   }, function (err) {
@@ -4882,14 +4892,31 @@ function pullLibrary() {
     return res.json();
   }).then(function (data) {
     var list = Array.isArray(data) ? data : (data && Array.isArray(data.resources) ? data.resources : []);
-    var added = mergeCloudResources(list);
+    var added = mergeCloudResources(list, true);
     state.cloud.lastSync = new Date().toISOString();
-    return { added: added, total: list.length };
+    return { added: added.added, total: list.length, removed: added.removed };
   });
 }
-function mergeCloudResources(list) {
+function mergeCloudResources(list, pruneMissing) {
   var added = 0;
   var changed = false;
+  var removed = 0;
+  var remoteIds = {};
+  var remotePaths = {};
+  list.forEach(function (remote) {
+    if (remote && remote.id) remoteIds[remote.id] = true;
+    if (remote && remote.path) remotePaths[remote.path] = true;
+  });
+  if (pruneMissing) {
+    var kept = [];
+    state.resources.forEach(function (r) {
+      if (r.source !== 'cloud') { kept.push(r); return; }
+      if (remoteIds[r.id] || (r.path && remotePaths[r.path])) { kept.push(r); return; }
+      removed++;
+      changed = true;
+    });
+    if (removed) state.resources = kept;
+  }
   list.forEach(function (remote) {
     if (!remote || !remote.fileName) return;
     var local = null;
@@ -4935,7 +4962,7 @@ function mergeCloudResources(list) {
     }
   });
   if (added || changed) saveResources();
-  return added;
+  return { added: added, removed: removed };
 }
 /* Migration helper: read the file list straight from the repository so an
    existing apps/ folder appears in the new subject cloud automatically. */
@@ -5272,16 +5299,27 @@ function uploadToCloud(file, meta, onProgress) {
     });
   });
 }
+function removeResourceLocally(item) {
+  var idx = -1;
+  for (var i = 0; i < state.resources.length; i++) {
+    if (state.resources[i].id === item.id) { idx = i; break; }
+  }
+  if (idx >= 0) state.resources.splice(idx, 1);
+  if (item.source === 'device') fileStore.del(item.id).catch(function () {});
+  saveResources();
+  try { store.remove(KEYS.tree); } catch (err) {}
+}
 function deleteFromCloud(item) {
-  if (item.source !== 'cloud' || !currentToken()) return Promise.resolve(false);
+  if (item.source !== 'cloud') return Promise.resolve(false);
+  if (!currentToken()) {
+    return Promise.reject(new Error('Save an access token before deleting a published file from GitHub.'));
+  }
   var path = item.path || cloudPath(item.fileName, item.year);
   return ghGetFile(path).then(function (existing) {
     if (!existing) return null;
     return ghDeleteFile(path, existing.sha, 'Subject cloud: delete ' + item.fileName);
   }).then(function () {
-    var idx = state.resources.indexOf(item);
-    if (idx >= 0) state.resources.splice(idx, 1);
-    saveResources();
+    removeResourceLocally(item);
     return pushLibrary().then(function () { return true; });
   });
 }
@@ -8072,24 +8110,23 @@ var ACTIONS = {
     confirmDialog({
       title: 'Delete “' + item.title + '”?',
       message: item.source === 'cloud'
-        ? 'This removes the file and its metadata from the cloud repository, then updates library.json. Students will not be able to download it afterwards.'
+        ? 'This deletes the file from GitHub (the cloud repository) and removes it from library.json and this website so students cannot download it afterwards.'
         : 'This removes the file stored in this browser.',
       confirmLabel: 'Delete file', danger: true
     }).then(function (ok) {
       if (!ok) return;
-      var finish = function () {
-        var idx = state.resources.indexOf(item);
-        if (idx >= 0) state.resources.splice(idx, 1);
-        if (item.source === 'device') fileStore.del(item.id).catch(function () {});
-        saveResources();
+      var done = function () {
         renderAll();
-        toast('“' + item.title + '” deleted.', 'success');
+        toast('“' + item.title + '” deleted from the website' + (item.source === 'cloud' ? ' and GitHub.' : '.'), 'success');
       };
-      if (item.source === 'cloud' && currentToken()) {
-        deleteFromCloud(item).then(finish).catch(function (err) {
+      if (item.source === 'cloud') {
+        deleteFromCloud(item).then(done).catch(function (err) {
           toast('Cloud delete failed: ' + err.message, 'error');
         });
-      } else { finish(); }
+      } else {
+        removeResourceLocally(item);
+        done();
+      }
     });
   },
   'student-expand': function (el) {
@@ -8575,13 +8612,10 @@ function init() {
     return 0;
   });
 
-  // Abacus is the public page-view counter: every complete document load,
-  // including a reload and a returning signed-in student, records one visit.
-  // It deliberately has no localStorage debounce. The detailed local/Supabase
-  // visit log keeps its existing 30-minute guard so reloads do not flood it.
-  countAbacusVisit();
-  var lastVisit = store.get('madv.lastVisitAt', 0);
-  if (!lastVisit || (Date.now() - Number(lastVisit)) > 30 * 60 * 1000) {
+  // Count a visit on a new tab/session or a new login — not on a browser refresh.
+  if (!sessionVisitCounted()) {
+    markSessionVisit();
+    countAbacusVisit();
     store.set('madv.lastVisitAt', Date.now());
     recordVisit({ skipAbacus: true });
   }
