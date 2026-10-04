@@ -5,8 +5,8 @@
 // the repository, the resource must be registered, and library.json — the list
 // every other device reads — must contain the new file *after* it is
 // registered, so a student on their own computer can see and download it.
-// Also covers the device-only fallback that publishes automatically as soon as
-// an access token is saved, and the retry when GitHub drops a list write.
+// Also covers duplicate uploads (including a write race), in-place SHA refresh
+// after a 422, the device-only fallback, and retrying a dropped list write.
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { createBackend } from './fake-supabase.mjs';
@@ -36,21 +36,32 @@ const LIBRARY = 'library.json';
 /* The fake repository, exactly as a student's device would see it ---------- */
 const repo = {
   library: null,          // the parsed library.json, null until it is written
-  files: new Map(),       // repository path -> { base64, size }
-  puts: [],               // every write, in order
+  librarySha: null,
+  files: new Map(),       // repository path -> { base64, size, sha }
+  puts: [],               // successful writes, in order (including dropped writes)
+  putAttempts: [],        // every attempted write, including real GitHub-style 422s
   deletes: [],
   dropLibraryWrites: 0,   // silently discard the next N library.json writes
   dropFileWrites: 0,
+  raceLibraryWrites: 0,   // change the SHA between a caller's read and write
+  raceFilePath: null,     // create a file after its availability read, before PUT
+  shaCounter: 0,
   rawLibraryReads: 0      // how many times a device read the published list
 };
+const nextSha = () => 'sha-' + (++repo.shaCounter);
 const resetRepo = () => {
   repo.library = null;
+  repo.librarySha = null;
   repo.files.clear();
   repo.puts.length = 0;
+  repo.putAttempts.length = 0;
   repo.deletes.length = 0;
   repo.rawLibraryReads = 0;
   repo.dropLibraryWrites = 0;
   repo.dropFileWrites = 0;
+  repo.raceLibraryWrites = 0;
+  repo.raceFilePath = null;
+  repo.shaCounter = 0;
 };
 const libraryResources = () => ((repo.library && repo.library.resources) || []);
 const libraryPuts = () => repo.puts.filter((p) => p.path === LIBRARY);
@@ -122,31 +133,78 @@ function makeFetch(w) {
       if (opts.method === 'PUT') {
         const body = JSON.parse(opts.body || '{}');
         const text = unb64(body.content);
+        const isLibrary = rel === LIBRARY;
+
+        // Simulate another browser creating library.json after this page saw
+        // GitHub's 404 but before its create-write reaches the Contents API.
+        if (isLibrary && repo.raceLibraryWrites > 0 && !repo.library) {
+          repo.raceLibraryWrites -= 1;
+          repo.library = { subject: 'Mathematics Advanced', resources: [] };
+          repo.librarySha = nextSha();
+        }
+        // Simulate a same-name upload winning after the availability GET. The
+        // following PUT must receive GitHub's real create-existing 422.
+        if (!isLibrary && repo.raceFilePath === rel && !repo.files.has(rel)) {
+          const raced = Buffer.from('%PDF-1.4 file created by a concurrent uploader');
+          repo.files.set(rel, { base64: raced.toString('base64'), size: raced.length, sha: nextSha() });
+          repo.raceFilePath = null;
+        }
+
+        const current = isLibrary
+          ? (repo.library ? { sha: repo.librarySha } : null)
+          : (repo.files.get(rel) || null);
+        const attempt = { path: rel, sha: body.sha, body: text, message: body.message };
+        repo.putAttempts.push(attempt);
+        // Match GitHub's Contents API: creating over an existing path without
+        // its blob SHA (or using a stale SHA) is rejected, never overwritten.
+        if (current && !body.sha) {
+          attempt.rejected = true;
+          attempt.status = 422;
+          return json(422, { message: 'Invalid request.\n\n"sha" wasn\'t supplied.' });
+        }
+        if (current && body.sha !== current.sha) {
+          attempt.rejected = true;
+          attempt.status = 409;
+          return json(409, { message: 'The file changed after it was read.' });
+        }
+        if (!current && body.sha) {
+          attempt.rejected = true;
+          attempt.status = 422;
+          return json(422, { message: 'Invalid request. The supplied sha does not exist.' });
+        }
+
         // A dropped write still answers 200 but never reaches the repository —
         // exactly how a lost/failed commit looks to the page.
-        const dropped = (rel === LIBRARY && repo.dropLibraryWrites > 0) || (rel !== LIBRARY && repo.dropFileWrites > 0);
+        const dropped = (isLibrary && repo.dropLibraryWrites > 0) || (!isLibrary && repo.dropFileWrites > 0);
         if (dropped) {
-          if (rel === LIBRARY) repo.dropLibraryWrites -= 1; else repo.dropFileWrites -= 1;
+          if (isLibrary) repo.dropLibraryWrites -= 1; else repo.dropFileWrites -= 1;
           repo.puts.push({ path: rel, message: body.message, body: text, bytes: Buffer.byteLength(text), dropped: true });
           return json(200, { content: { sha: 'dropped' }, commit: { sha: 'dropped' } });
         }
         repo.puts.push({ path: rel, message: body.message, body: text, bytes: Buffer.byteLength(text) });
-        if (rel === LIBRARY) repo.library = JSON.parse(text);
-        else repo.files.set(rel, { base64: body.content, size: Buffer.byteLength(text) });
-        return json(200, { content: { sha: 'sha-' + rel }, commit: { sha: 'c1', html_url: 'https://github.com/' + REPO + '/commit/c1' } });
+        const fileSha = nextSha();
+        if (isLibrary) {
+          repo.library = JSON.parse(text);
+          repo.librarySha = fileSha;
+        } else {
+          repo.files.set(rel, { base64: body.content, size: Buffer.byteLength(text), sha: fileSha });
+        }
+        return json(200, { content: { sha: fileSha }, commit: { sha: nextSha(), html_url: 'https://github.com/' + REPO + '/commit/c1' } });
       }
       if (opts.method === 'DELETE') {
         repo.deletes.push(rel);
-        if (rel === LIBRARY) repo.library = null; else repo.files.delete(rel);
+        if (rel === LIBRARY) { repo.library = null; repo.librarySha = null; }
+        else repo.files.delete(rel);
         return json(200, { commit: { sha: 'd1' } });
       }
       if (rel === LIBRARY) {
         if (!repo.library) return json(404, { message: 'Not Found' });
-        return json(200, { sha: 'lib-sha', content: b64(JSON.stringify(repo.library)), size: 2 });
+        return json(200, { sha: repo.librarySha, content: b64(JSON.stringify(repo.library)), size: 2 });
       }
       const file = repo.files.get(rel);
       if (!file) return json(404, { message: 'Not Found' });
-      return json(200, { sha: 'sha-' + rel, content: file.base64, size: file.size });
+      // GitHub may return metadata without base64 for larger Contents blobs.
+      return json(200, { sha: file.sha, content: file.size > 1024 * 1024 ? null : file.base64, size: file.size });
     }
 
     // --- everything else is the shared Supabase backend ------------------
@@ -318,8 +376,99 @@ check('the second file is marked published, not pending',
   app.state.resources.filter((r) => r.fileName === secondUpload));
 check('the first entry is still in the list', libraryResources().some((r) => r.fileName === 'Integration practice.pdf'), libraryResources().map((r) => r.fileName));
 
-/* 5. No token: the file waits on the device and is published automatically - */
-console.log('\n5. a file uploaded without a token is published as soon as one is saved');
+/* 5. Re-uploading names creates separate, downloadable copies ------------- */
+console.log('\n5. repeated uploads keep every same-name copy');
+const uploadDay = new Date().toISOString().slice(0, 10);
+const firstPracticePath = 'resources/Year 12/Integration practice.pdf';
+const datedPracticePath = 'resources/Year 12/Integration practice (' + uploadDay + ').pdf';
+const numberedPracticePath = 'resources/Year 12/Integration practice (' + uploadDay + ') 2.pdf';
+const originalPracticeBytes = unb64(repo.files.get(firstPracticePath).base64);
+await uploadResource(app, {
+  name: 'Integration practice.pdf', title: 'Integration practice second copy',
+  bytes: '%PDF-1.4 second practice upload'
+});
+const secondCopy = app.state.resources.find((r) => r.title === 'Integration practice second copy');
+check('the second upload uses the date-suffixed free name', secondCopy && secondCopy.path === datedPracticePath, secondCopy);
+check('the first upload was not replaced', unb64(repo.files.get(firstPracticePath).base64) === originalPracticeBytes, repo.files.get(firstPracticePath));
+await uploadResource(app, {
+  name: 'Integration practice.pdf', title: 'Integration practice third copy',
+  bytes: '%PDF-1.4 third practice upload'
+});
+const thirdCopy = app.state.resources.find((r) => r.title === 'Integration practice third copy');
+check('the third upload uses the next numbered free name', thirdCopy && thirdCopy.path === numberedPracticePath, thirdCopy);
+check('all three file contents remain stored at their own paths',
+  unb64(repo.files.get(firstPracticePath).base64) === originalPracticeBytes &&
+  unb64(repo.files.get(datedPracticePath).base64) === '%PDF-1.4 second practice upload' &&
+  unb64(repo.files.get(numberedPracticePath).base64) === '%PDF-1.4 third practice upload',
+  [...repo.files.keys()].filter((p) => p.includes('Integration practice')));
+const practicePaths = [firstPracticePath, datedPracticePath, numberedPracticePath];
+const listedPracticeCopies = libraryResources().filter((r) => practicePaths.includes(r.path));
+check('library.json keeps all three same-name uploads listed',
+  listedPracticeCopies.length === 3 && practicePaths.every((p) => listedPracticeCopies.some((r) => r.path === p)),
+  listedPracticeCopies.map((r) => r.path));
+const copyStudent = boot();
+const copyStudentApp = await ready(copyStudent);
+await copyStudentApp.pullLibrary();
+const studentPracticeCopies = copyStudentApp.state.resources.filter((r) => practicePaths.includes(r.path));
+const copyDownloads = await Promise.all(studentPracticeCopies.map((r) => copyStudentApp.fetchFileBlob(r)));
+check('a student device can download each listed copy',
+  studentPracticeCopies.length === 3 && copyDownloads.every((b) => b && b.size > 0),
+  copyDownloads.map((b) => b && b.size));
+const largeOriginalPath = 'resources/Year 12/Large workbook.pdf';
+const largeOriginalBytes = Buffer.alloc(1024 * 1024 + 1, 65);
+repo.files.set(largeOriginalPath, {
+  base64: largeOriginalBytes.toString('base64'), size: largeOriginalBytes.length, sha: nextSha()
+});
+await uploadResource(app, { name: 'Large workbook.pdf', title: 'Large workbook repeat' });
+const largeRepeat = app.state.resources.find((r) => r.title === 'Large workbook repeat');
+check('name checks still work when GitHub omits a large file body',
+  largeRepeat && largeRepeat.path === 'resources/Year 12/Large workbook (' + uploadDay + ').pdf' &&
+  Buffer.from(repo.files.get(largeOriginalPath).base64, 'base64').equals(largeOriginalBytes),
+  largeRepeat);
+
+/* 6. A write race picks another name and refreshes in-place SHAs ----------- */
+console.log('\n6. a same-name race advances to a free name; library writes refresh their SHA');
+resetRepo();
+const raceAdmin = boot();
+const raceApp = await ready(raceAdmin);
+await signInAsAdmin(raceAdmin);
+const raceOriginal = 'resources/Year 12/Concurrent practice.pdf';
+const raceDate = 'resources/Year 12/Concurrent practice (' + uploadDay + ').pdf';
+const raceRetry = 'resources/Year 12/Concurrent practice (' + uploadDay + ') 2.pdf';
+// Another browser creates library.json after the first admin saw a 404.
+repo.raceLibraryWrites = 1;
+await uploadResource(raceApp, { name: 'Concurrent practice.pdf', title: 'Concurrent practice original', bytes: '%PDF-1.4 race original' });
+const raceOriginalBytes = repo.files.get(raceOriginal).base64;
+const libraryRaceAttempts = repo.putAttempts.filter((p) => p.path === LIBRARY);
+check('library.json create race returns 422 for the missing SHA, then retries with the reread SHA',
+  libraryRaceAttempts.length === 2 && libraryRaceAttempts[0].rejected && libraryRaceAttempts[0].status === 422 &&
+  libraryRaceAttempts[0].sha === undefined && !!libraryRaceAttempts[1].sha && !libraryRaceAttempts[1].rejected,
+  libraryRaceAttempts);
+repo.raceFilePath = raceDate;
+await uploadResource(raceApp, { name: 'Concurrent practice.pdf', title: 'Concurrent practice retried', bytes: '%PDF-1.4 race retry upload' });
+const retriedRaceCopy = raceApp.state.resources.find((r) => r.title === 'Concurrent practice retried');
+const rejectedFileRace = repo.putAttempts.find((p) => p.path === raceDate && p.rejected);
+check('a candidate taken between GET and PUT is rejected by fake GitHub with 422',
+  !!rejectedFileRace && rejectedFileRace.status === 422 && rejectedFileRace.sha === undefined, rejectedFileRace);
+check('the upload continues under the next free name', retriedRaceCopy && retriedRaceCopy.path === raceRetry, retriedRaceCopy);
+check('the original and racing writer files were not overwritten',
+  repo.files.get(raceOriginal).base64 === raceOriginalBytes &&
+  unb64(repo.files.get(raceDate).base64).includes('concurrent uploader') &&
+  unb64(repo.files.get(raceRetry).base64) === '%PDF-1.4 race retry upload',
+  [raceOriginal, raceDate, raceRetry].map((p) => ({ path: p, file: repo.files.get(p) })));
+check('library.json lists the original and this upload, never the unregistered race file',
+  libraryResources().some((r) => r.path === raceOriginal) && libraryResources().some((r) => r.path === raceRetry) &&
+  !libraryResources().some((r) => r.path === raceDate), libraryResources().map((r) => r.path));
+let final422;
+try {
+  await raceApp.ghPutFile(LIBRARY, Buffer.from('unconditional overwrite').toString('base64'), 'test a rejected write');
+} catch (err) { final422 = err; }
+check('an unrecovered 422 is shown in plain language, not GitHub raw JSON',
+  !!final422 && final422.status === 422 && /could not save this change/i.test(final422.message) &&
+  !/Invalid request|sha.*wasn.t supplied/i.test(final422.message), final422 && final422.message);
+
+/* 7. No token: the file waits on the device and is published automatically - */
+console.log('\n7. a file uploaded without a token is published as soon as one is saved');
 resetRepo();
 const offlineAdmin = boot();
 const waiting = await ready(offlineAdmin);
@@ -352,8 +501,8 @@ check('the teacher was told the waiting file was published',
 waiting.renderFilesTable();
 check('the dashboard now reports it as cloud-published', /Cloud · in library\.json/.test(waiting.document.querySelector('#files-body').textContent), waiting.document.querySelector('#files-body').textContent.slice(0, 200));
 
-/* 6. A file in GitHub whose list write failed can be repaired ------------- */
-console.log('\n6. a failed list write keeps the file and can be repaired');
+/* 8. A file in GitHub whose list write failed can be repaired ------------- */
+console.log('\n8. a failed list write keeps the file and can be repaired');
 resetRepo();
 const repairAdmin = boot();
 const repair = await ready(repairAdmin);
@@ -377,8 +526,8 @@ check('the repaired entry keeps the file path', libraryResources().some((r) => r
 repair.renderFilesTable();
 check('the dashboard reports it as published again', /Cloud · in library\.json/.test(repair.document.querySelector('#files-body').textContent), repair.document.querySelector('#files-body').textContent.slice(0, 160));
 
-/* 7. An open student tab learns about a file uploaded during the lesson ---- */
-console.log('\n7. an open student tab picks up a file uploaded during the lesson');
+/* 9. An open student tab learns about a file uploaded during the lesson ---- */
+console.log('\n9. an open student tab picks up a file uploaded during the lesson');
 const beforeRefresh = studentApp.state.resources.length;
 const readsBefore = repo.rawLibraryReads;
 const fresh = await studentApp.refreshPublishedLibrary(120000);   // just synced: no request
