@@ -1,7 +1,7 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T14:02:34.065Z",
+  "updatedAt": "2026-10-04T14:13:19.796Z",
   "resources": [
     {
       "id": "res_musdpe0cjuawqo",
@@ -41,11 +41,34 @@
       "keywords": [],
       "addedAt": "2026-10-04T08:21:46.067Z",
       "bytes": 1225287,
-      "downloads": 2,
-      "lastDownloadAt": "2026-10-04T10:42:03Z",
+      "downloads": 3,
+      "lastDownloadAt": "2026-10-04T14:12:24Z",
       "visible": true,
       "visibility": "all",
       "path": "resources/Year 11/Knox 2025 w. sol.pdf",
+      "source": "cloud",
+      "published": true
+    },
+    {
+      "id": "res_mutw4iuyw6ig74",
+      "title": "Sydney Boys 2026 W. Sol",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "ext": "pdf",
+      "kind": "document",
+      "year": "Year 11",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "description": "",
+      "owner": "peter82",
+      "department": "Mathematics",
+      "keywords": [],
+      "addedAt": "2026-10-04T14:02:38.074Z",
+      "bytes": 9265650,
+      "downloads": 0,
+      "lastDownloadAt": "2026-10-04T14:11:45Z",
+      "visible": true,
+      "visibility": "all",
+      "path": "resources/Year 11/Sydney Boys 2026 w. sol.pdf",
       "source": "cloud",
       "published": true
     }
