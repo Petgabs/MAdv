@@ -113,7 +113,13 @@ let e2 = await rpc('public.madv_admin_export', { a: 'peter82', b: 'petgabs82', c
 check('export honours the caller day', e2.counters.day === testDay && e2.counters.visitsToday === 3 && e2.counters.downloadsToday === 3, e2.counters);
 check('exported students never leak to a bad password', e0.students === undefined, e0);
 
-console.log('\n8. admin can block and edit a student');
+console.log('\n8. username collisions remain unique after name truncation');
+let c5 = await rpc('public.madv_register', { a: 'abcdefghijklmnopqrstuvwxA', b: 'Year 10', c: 'stu_hhhhhhhh' });
+let c6 = await rpc('public.madv_register', { a: 'abcdefghijklmnopqrstuvwxB', b: 'Year 10', c: 'stu_iiiiiiii' });
+check('first long name gets the 24-character base', c5.ok === true && c5.username === 'abcdefghijklmnopqrstuvwx', c5);
+check('second truncated-name collision gets the next username', c6.ok === true && c6.username === 'abcdefghijklmnopqrstuvwx2', c6);
+
+console.log('\n9. admin can block and edit a student');
 let b1 = await rpc('public.madv_admin_student', { a: 'upsert', b: JSON.stringify({ clientId: 'stu_aaaaaaaa', status: 'blocked' }), c: 'peter82', d: 'petgabs82' });
 check('blocked ok', b1.ok === true && b1.status === 'blocked', b1);
 let bl = await rpc('public.madv_login', { a: 'peter', b: 'peter11' });
@@ -127,7 +133,7 @@ check('delete works', b4.ok === true && b4.deleted === true, b4);
 let b5 = await rpc('public.madv_admin_student', { a: 'upsert', b: JSON.stringify({ clientId: 'stu_aaaaaaaa' }), c: 'peter82', d: 'wrong' });
 check('admin gate enforced on edits', b5.ok === false, b5);
 
-console.log('\n9. admin config');
+console.log('\n10. admin config');
 let c1 = await rpc('public.madv_admin_config', { a: JSON.stringify({ open_registration: 'false' }), b: 'peter82', c: 'petgabs82' });
 check('config updated', c1.ok === true && c1.updated === 1, c1);
 let c2 = await rpc('public.madv_register', { a: 'Closed', b: 'Year 11', c: 'stu_gggggggg' });
@@ -135,11 +141,11 @@ check('closed registration blocks new students', c2.ok === false && /closed/i.te
 let c3 = await rpc('public.madv_admin_config', { a: JSON.stringify({ open_registration: 'true', sneaky: 'x' }), b: 'peter82', c: 'petgabs82' });
 check('unknown config keys ignored', c3.ok === true && c3.updated === 1, c3);
 
-console.log('\n10. helpers');
+console.log('\n11. helpers');
 check('year digits', (await fn('madv_year_digits', ['Year 11'])) === '11', await fn('madv_year_digits', ['Year 11']));
 check('title case', (await fn('madv_titlecase', ['mary  jane'])) === 'Mary Jane', await fn('madv_titlecase', ['mary  jane']));
 
-console.log('\n11. direct table access is revoked for anon');
+console.log('\n12. direct table access is revoked for anon');
 const grants = await db.query(`select has_table_privilege('anon', 'public.madv_students', 'SELECT') as sel,
                                       has_table_privilege('anon', 'public.madv_students', 'INSERT') as ins`);
 check('anon cannot select students', grants.rows[0].sel === false, grants.rows[0]);

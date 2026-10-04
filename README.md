@@ -13,17 +13,19 @@ subject cloud for one teacher and their classes:
 * the **admin dashboard** shows every registered student, their username and
   password, last visit time, how many times they visited and exactly which
   files they downloaded — plus shared visitor and per-file download counters;
-* an hourly **GitHub Action** can mirror the optional student register and an
+* an hourly **GitHub Action** mirrors a password-free student roster and
   activity snapshot into `data/cloud-data.json`; live site-wide counters remain
   in Abacus.
 
 The student-facing front end remains a single **`index.html`** with no frontend
 build step; its JavaScript, CSS and icons are inline. Site-wide visitor and
 published-file download totals are shared through the free **Abacus counter
-API** automatically; no key, account or server setup is needed. The optional
-**Supabase** project (`backends/supabase/schema.sql`) shares student accounts,
-sign-ins and detailed student activity. Without Supabase, the public counters
-still work while student records remain browser-local.
+API** automatically; no key, account or server setup is needed. Online student
+registration and cross-device sign-in require the **Supabase** shared backend
+(`backends/supabase/schema.sql`). If it is unavailable or not configured, the
+site does not issue a device-only account and falsely report that registration
+succeeded. The admin dashboard reads the shared roster live; a GitHub Action
+also mirrors a password-free snapshot to the repository.
 
 **Why a backend is needed at all.** GitHub Pages is static, so a browser can
 never write to the repository on its own — that would mean shipping a GitHub
@@ -47,12 +49,14 @@ browser; never commit it or hide it in the page.
 The site detects its own repository from the Pages address, so students'
 devices automatically find the shared library.
 
-## 2. Optional shared student backend (once, ~10 minutes)
+## 2. Required for online student registration (once, ~10 minutes)
 
 Abacus already shares the visitor counter, total file downloads and per-file
-download counts; it is active automatically and needs no settings. Set up
-Supabase only if you want student registration, sign-in and detailed student
-activity shared across devices.
+download counts; it is active automatically and needs no settings. Set up the
+Supabase shared register before opening student self-registration. A student
+account is only confirmed after the database has issued and stored its unique
+username and password. A disconnected or offline request is rejected rather
+than creating an account that exists only on one device.
 
 1. Create a free account at **supabase.com** and create one project (the free
    tier is plenty for a class).
@@ -63,7 +67,7 @@ activity shared across devices.
    * the **Project URL** (`https://abcdefghijklmnop.supabase.co`),
    * the **publishable key** (`sb_publishable_…`, or the legacy `anon` JWT).
 4. On the site, sign in as **Admin** (`peter82` / `petgabs82`) and open
-   **Cloud settings → Shared cloud sync**. Paste the URL and the key and press
+   **Cloud settings → Shared student register**. Paste the URL and key and press
    **Save to GitHub**. That writes them to `data/sync-config.json` in the
    repository, so every device picks the backend up automatically.
 5. Press **Test connection** — it should report how many students are
@@ -73,15 +77,16 @@ activity shared across devices.
 bypasses Row Level Security and must never be pasted into the page, the
 repository or the workflow. The page refuses to save one.
 
-> The free Supabase project pauses after about a week with no traffic and wakes
-> up again on the next request. While it is paused, student registrations and
-> activity are queued locally. Abacus visitor/download counters work separately
-> and do not depend on the Supabase project.
+> The free Supabase project may pause after a period with no traffic and wake
+> on the next request. While it is unavailable, registration does not show as
+> complete or issue credentials; retrying the same name and year safely resumes
+> the request. Some activity events can be queued locally. Abacus
+> visitor/download counters work separately and do not depend on Supabase.
 
 ### How a registration reaches the repository
 
 ```
-student's phone ──▶ Supabase (optional; publishable key + Row Level Security)
+student's phone ──▶ Supabase (required for online accounts; publishable key + Row Level Security)
                          │ madv_register / madv_login / student activity log
                          ▼
              .github/workflows/cloud-sync.yml (hourly, GitHub-hosted)
@@ -98,8 +103,10 @@ all visitors ──▶ Abacus (anonymous /get and /hit requests)
 2. Hourly, the GitHub Action calls `madv_admin_export` and commits the register
    and an activity snapshot to `data/cloud-data.json`. Passwords are never
    written.
-3. Any browser loads the roster mirror for the admin dashboard. Site-wide
-   counters are read directly from Abacus, not from that snapshot.
+3. The administrator dashboard reads the live student register from Supabase
+   when it opens, when it returns to focus and when **Refresh live data** is
+   pressed. The GitHub file is a backup/public mirror, not the live source of
+   truth. Site-wide counters are read directly from Abacus.
 
 If you change the administrator sign-in on the site, add matching
 **Settings → Secrets and variables → Actions** secrets named `ADMIN_USER` and
@@ -114,7 +121,7 @@ and write** so the job can commit.
 | 1 | Open the site and click **Admin**. Sign in with **`peter82`** / **`petgabs82`** (change these in Cloud settings → *Administrator sign-in*). |
 | 2 | **Cloud settings → Access token**: create a GitHub *fine-grained personal access token* scoped to **only this repository** with the single permission **Contents: Read and write**, paste it and press **Save access token** (then **Test connection**). The token stays in that admin browser only; never copy it into GitHub files or the shared page. |
 | 3 | **Cloud settings → Cloud location**: check the repository (`owner/name`), branch, upload folder (`resources`) and data folder (`data`). Press **Detect this repository** if the box is empty. |
-| 4 | Optional: **Cloud settings → Shared cloud sync**: paste the Supabase URL and publishable key from section 2, press **Save to GitHub**, then **Test connection** to share student accounts and activity. Abacus counters need no setup. |
+| 4 | **Required for student registration**: in **Cloud settings → Shared student register**, paste the Supabase URL and publishable key from section 2, press **Save to GitHub**, then **Test connection**. Student registration stays disabled until the shared backend is available. Abacus counters need no setup. |
 | 5 | **Upload Resource**: choose the file, give it a name, then set **Year level**, **Topic** and **Resource type**. Press **Upload resource**. |
 | 6 | Repeat for every resource. The library, `library.json` and student downloads update instantly. |
 
@@ -133,9 +140,11 @@ stored only in the browser that uploaded them and are marked *This device only*.
    other, because the register is shared.
 
 Students can be blocked, deleted or password-reset from the admin page;
-blocked accounts are refused everywhere as soon as the change syncs. If a
-device is offline when a student registers, the account is saved locally and
-pushed to the shared register as soon as the connection returns.
+blocked accounts are refused everywhere as soon as the change syncs. A
+registration attempted while offline or while the shared backend is unavailable
+is not completed: no credentials or local-only account are issued, and the
+student can retry when the connection returns. This prevents a false success
+message and avoids an account that is missing from the online admin roster.
 
 ## 5. Classifying resources
 
@@ -210,7 +219,7 @@ add an option everywhere.
 | Uploaded files (published) | The GitHub repository, folder `resources/<Year level>/…` |
 | Resource list and cached per-file totals | `library.json` in the repository; live per-file totals are read from Abacus |
 | Shared site-wide visitor/download totals | Abacus counter API (`petgabs-github-io-madv` namespace; no key required) |
-| Student register and detailed activity | Optional Supabase (`madv_students`, `madv_visits`, `madv_downloads`, etc.) — passwords are needed to verify sign-in |
+| Live student register and detailed activity | Supabase (`madv_students`, `madv_visits`, `madv_downloads`, etc.) — required for online self-registration and cross-device sign-in; passwords stay here, never in GitHub's public mirror |
 | Supabase address (URL + publishable key, both public) | `data/sync-config.json` in the repository, and cached in each browser |
 | Repository mirror of the register and activity snapshot | `data/cloud-data.json` — names, usernames and counts, **no passwords**; not authoritative for Abacus totals |
 | Local working copy: students, logs, cached counters, settings, offline queues | Each browser's `localStorage` |
@@ -225,10 +234,13 @@ and activity counts**; it never holds passwords. Turn off *Let the repository
 mirror keep student names and usernames* in Cloud settings → **Shared cloud
 sync** to publish counters only.
 
-* Passwords are the deterministic username-plus-year pattern, which is a
-  convenience gate, not real authentication. They are compared inside the
-  database (`madv_login`), so the roster is not downloadable and a wrong
-  password cannot be matched against a leaked copy.
+* Passwords follow the deterministic username-plus-year pattern. This is a
+  convenience gate, not private authentication: the rule is visible in the
+  public website code, and anyone who can read a mirrored username/year can
+  derive the password. The snapshot omits the password field, but this pattern
+  should not be treated as a secret. Turn off the repository roster mirror if
+  publishing student names and usernames is not acceptable; do not use these
+  accounts to protect sensitive material.
 * The shared backend is protected by Row Level Security: the direct tables have
   no policies and their privileges are revoked, so the publishable key can only
   call the `madv_*` functions, which validate their input.
@@ -245,9 +257,9 @@ sync** to publish counters only.
 | Symptom | Fix |
 | --- | --- |
 | Students can't see uploaded files | Check that the repository is public, Pages is deployed, and `library.json` lists the file. A token is needed only in the admin browser to publish it. |
-| Student cannot log in from a second device | The shared backend is not connected (or was unreachable when the student registered). Check **Cloud settings → Shared cloud sync → Test connection**; the admin dashboard shows any pending changes. |
+| Student cannot log in from a second device | Check **Cloud settings → Shared student register → Test connection**. Online registration is only confirmed after the shared backend accepts it; the admin dashboard refreshes the live roster when opened and on return to focus. |
+| Online registration is not ready | Configure the Supabase URL and publishable key in **Cloud settings → Shared student register**, then run `backends/supabase/schema.sql`. Registration is intentionally not completed on a single browser when this backend is unavailable. |
 | "Please use letters only for the first name" for an ordinary name | Fixed in this version: the name check used to reject almost every real name. Reload the page to pick up the new `index.html`. |
-| Registration says it was saved on this device | The backend was unreachable. The account is queued and syncs by itself; press **Sync now** once the connection is back. |
 | Abacus counters do not move | Check the Abacus status in the admin dashboard and make sure the browser can reach `https://abacus.jasoncameron.dev`. The API may be rate-limited or temporarily unavailable; cached/local counts remain visible. Supabase **Sync now** refreshes student activity, not the Abacus totals. |
 | The repository mirror is empty or stale | Run the **Mirror the shared register** workflow manually (Actions → Run workflow) and check that `ADMIN_USER` / `ADMIN_PASS` match the site's administrator sign-in. |
 | Token rejected (HTTP 401/403) | Create a new fine-grained token with **Contents: Read and write**, save it again. |
@@ -258,7 +270,7 @@ sync** to publish counters only.
 
 ```bash
 npm install     # PGlite (PostgreSQL in WASM) + jsdom, test-only
-npm test        # 55 SQL/backend checks + 58 end-to-end browser checks
+npm test        # SQL/backend tests + end-to-end browser and exporter tests
 npm run sync:cloud-data   # write data/cloud-data.json from the shared backend now
 ```
 
