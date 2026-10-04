@@ -1,4 +1,4 @@
-// Test: the admin upload page's "The file" section — the 50 MB ceiling,
+// Test: the admin upload page's file-picker section — the 50 MB ceiling,
 // the size-check meter, and the sign-in/help screens staying free of default
 // credentials. Loads the real index.html in jsdom like e2e.test.mjs does.
 import { JSDOM } from 'jsdom';
@@ -53,6 +53,15 @@ console.log('1. fresh defaults');
   const input = d.querySelector('#opt-max-size');
   check('settings input capped at 50', input.max === '50' && input.value === '50');
   check('dropzone exists with file input', !!d.querySelector('#dropzone') && !!d.querySelector('#upload-file'));
+  const dropzone = d.querySelector('#dropzone');
+  check('dropzone uses a structured grid layout', w.getComputedStyle(dropzone).display === 'grid');
+  check('browse instruction is a separate line',
+    d.querySelector('.dropzone__subtitle').textContent.includes('or click to browse')
+    && w.getComputedStyle(d.querySelector('.dropzone__subtitle')).display === 'block');
+  check('dropzone provides an accessible browse action',
+    dropzone.getAttribute('role') === 'button' && dropzone.getAttribute('aria-label')
+    && dropzone.getAttribute('aria-describedby') === 'upload-file-help');
+  check('browse action is visible in the dropzone', /Browse files/.test(d.querySelector('.dropzone__action').textContent));
   check('facts grid has three facts', d.querySelectorAll('.dz-fact').length === 3);
   check('format chips render', d.querySelectorAll('.dz-fact .tag--slate').length >= 8);
   check('picked panel starts hidden', d.querySelector('#picked-file-wrap').hidden);

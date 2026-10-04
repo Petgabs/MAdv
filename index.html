@@ -405,6 +405,28 @@ table.data th.num{text-align:right}
 @media (min-width:1024px){.split{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr)}}
 .split--even{grid-template-columns:1fr}
 @media (min-width:1024px){.split--even{grid-template-columns:1fr 1fr}}
+.band--upload{padding:1.75rem 2rem}
+.band--upload .band__inner{align-items:flex-end}
+.band--upload .band__copy{flex:1 1 32rem;min-width:0}
+.band--upload .upload-kicker{display:flex;align-items:center;gap:.45rem;margin:0 0 .55rem;color:var(--indigo-200);
+  font-size:.68rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase}
+.band--upload .upload-kicker .ico{color:var(--emerald-300)}
+.band--upload h2{line-height:1.15}
+.band--upload .band__copy > p:not(.upload-kicker){max-width:52rem}
+.band--upload .band__actions{flex-direction:column;align-items:flex-start;justify-content:flex-end}
+.upload-safe-note{display:flex;align-items:center;gap:.45rem;color:var(--emerald-100);font-size:.76rem;font-weight:600;line-height:1.4}
+.upload-safe-note .ico{color:var(--emerald-300);flex:none}
+.split--upload{grid-template-columns:1fr}
+.upload-sidebar{min-width:0}
+.preview-panel__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin-bottom:.85rem}
+.preview-panel__head h3{min-width:0}
+.upload-sidebar .panel--pad{min-width:0}
+@media (min-width:1100px){.split--upload{grid-template-columns:minmax(0,1.45fr) minmax(19rem,.75fr)}}
+@media (max-width:1099px){.split--upload .upload-sidebar{position:static}}
+@media (max-width:640px){
+  .band--upload{padding:1.25rem}
+  .band--upload .band__actions{width:100%;align-items:flex-start}
+}
 .sticky-col{position:sticky;top:calc(var(--header-h) + .75rem)}
 @media (max-width:1023px){.sticky-col{position:static}}
 .step-badge{display:inline-grid;place-items:center;width:1.6rem;height:1.6rem;border-radius:999px;
@@ -412,26 +434,62 @@ table.data th.num{text-align:right}
 .step-head{display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem}
 .step-head h3{font-size:.95rem;font-weight:800}
 .step-head p{font-size:.75rem;color:var(--slate-500)}
-.dropzone{border:2px dashed var(--slate-300);border-radius:var(--radius-xl);padding:1.5rem;text-align:center;
-  background:var(--slate-50);cursor:pointer;transition:.18s}
-.dropzone:hover,.dropzone.is-over{border-color:var(--indigo-500);background:var(--indigo-50)}
-.dropzone .ico{color:var(--indigo-600);margin:0 auto .5rem}
+.upload-form{gap:1.1rem}
+.upload-step{min-width:0;border-color:var(--slate-200);box-shadow:var(--shadow-sm)}
+.upload-step .step-head{align-items:flex-start;gap:.8rem;margin-bottom:1.1rem}
+.upload-step .step-head p{margin-top:.2rem;line-height:1.5}
+.upload-step .step-badge{width:1.85rem;height:1.85rem;box-shadow:0 2px 6px rgb(79 70 229 / .2)}
+@media (max-width:560px){
+  .upload-step--file .step-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.65rem .8rem}
+  .upload-step--file .step-head > .tag{grid-column:2;justify-self:start}
+}
+.dropzone{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:1rem;
+  min-height:7.5rem;padding:1.15rem 1.25rem;border:2px dashed var(--slate-300);border-radius:var(--radius-xl);
+  background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);text-align:left;cursor:pointer;
+  transition:border-color .18s,background-color .18s,box-shadow .18s,transform .18s}
+.dropzone:hover,.dropzone.is-over{border-color:var(--indigo-500);background:linear-gradient(135deg,#eef2ff 0%,#e0e7ff 100%);box-shadow:0 0 0 3px rgb(99 102 241 / .08)}
+.dropzone:active{transform:translateY(1px)}
+.dropzone:focus-visible{outline:none;box-shadow:var(--ring)}
+.dropzone__icon{display:grid;place-items:center;width:3.25rem;height:3.25rem;border:1px solid var(--indigo-100);
+  border-radius:var(--radius-xl);background:#fff;color:var(--indigo-600);box-shadow:var(--shadow-sm)}
+.dropzone__icon .ico{width:1.65rem;height:1.65rem;margin:0}
+.dropzone__copy{display:flex;flex-direction:column;gap:.18rem;min-width:0}
+.dropzone__title,.dropzone__subtitle,.dropzone__formats{display:block;overflow-wrap:anywhere}
+.dropzone__title{font-size:.96rem;font-weight:800;line-height:1.35;color:var(--slate-900)}
+.dropzone__subtitle{font-size:.84rem;line-height:1.45;color:var(--slate-600)}
+.dropzone__formats{margin-top:.16rem;font-size:.7rem;line-height:1.4;color:var(--slate-500)}
+.dropzone__action{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;white-space:nowrap;
+  padding:.65rem .9rem;border:1px solid var(--indigo-200);border-radius:var(--radius-lg);background:#fff;
+  color:var(--indigo-700);font-size:.82rem;font-weight:800;box-shadow:var(--shadow-xs);transition:background-color .15s,border-color .15s}
+.dropzone:hover .dropzone__action,.dropzone.is-over .dropzone__action{background:var(--indigo-600);border-color:var(--indigo-600);color:#fff}
+.upload-file-help{display:flex;align-items:flex-start;gap:.4rem;margin-top:.6rem;line-height:1.5}
+.upload-file-help .ico{color:var(--emerald-600);flex:none;margin-top:.05rem}
+@media (max-width:560px){
+  .dropzone{grid-template-columns:auto minmax(0,1fr);gap:.75rem;padding:1rem}
+  .dropzone__icon{width:2.85rem;height:2.85rem}
+  .dropzone__action{grid-column:1/-1;width:100%}
+}
+@media (max-width:380px){
+  .dropzone{grid-template-columns:1fr;text-align:center}
+  .dropzone__icon{margin-inline:auto}
+}
 .picked-file{display:flex;align-items:center;gap:.75rem;background:#fff;border:1px solid var(--slate-200);
-  border-radius:var(--radius-lg);padding:.7rem .85rem}
+  border-radius:var(--radius-lg);padding:.7rem .85rem;min-width:0}
 .picked-file__name{font-size:.92rem;font-weight:700;overflow-wrap:anywhere}
 .picked-panel{background:var(--slate-50);border:1px solid var(--slate-200);border-radius:var(--radius-lg);padding:.75rem .85rem}
 .picked-panel__head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.6rem}
 .picked-panel__title{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:800;color:var(--slate-700)}
 .picked-panel__title .ico{color:var(--emerald-600)}
 .picked-panel .picked-file{background:#fff}
-.dz-facts{display:grid;gap:.6rem}
-@media (min-width:768px){.dz-facts{grid-template-columns:repeat(3,minmax(0,1fr))}}
-.dz-fact{background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-lg);padding:.7rem .8rem}
-.dz-fact__label{display:inline-flex;align-items:center;gap:.4rem;font-size:.66rem;font-weight:800;letter-spacing:.07em;
+.dz-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.dz-fact{min-width:0;background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-lg);padding:.8rem .85rem}
+.dz-fact--formats{grid-column:1/-1}
+.dz-fact__label{display:inline-flex;align-items:center;gap:.4rem;font-size:.68rem;font-weight:800;letter-spacing:.07em;
   text-transform:uppercase;color:var(--slate-500)}
 .dz-fact__label .ico{color:var(--indigo-600)}
-.dz-fact__value{display:block;margin-top:.45rem;font-size:.8rem;color:var(--slate-600);line-height:1.55}
+.dz-fact__value{display:block;margin-top:.45rem;font-size:.8rem;color:var(--slate-600);line-height:1.55;overflow-wrap:anywhere}
 .dz-fact__value--chips{display:flex;flex-wrap:wrap;gap:.4rem}
+@media (max-width:560px){.dz-facts{grid-template-columns:1fr}.dz-fact--formats{grid-column:auto}}
 .size-meter{margin-top:.6rem}
 .size-meter__top{display:flex;justify-content:space-between;gap:.75rem;font-size:.72rem;color:var(--slate-500);margin-bottom:.3rem}
 .size-meter__track{height:.45rem}
@@ -1359,53 +1417,56 @@ table.data th.num{text-align:right}
     <!-- =====================================================================
          VIEW 4 — Upload resource (teacher / admin)
          ===================================================================== -->
-    <div class="view" id="view-upload">
-      <div class="band">
+    <div class="view" id="view-upload" aria-labelledby="upload-page-heading">
+      <div class="band band--upload">
         <div class="band__inner">
-          <div>
+          <div class="band__copy">
             <button type="button" class="band__back" data-action="go-home">
               <svg class="ico ico--sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Back to student library
             </button>
+            <p class="upload-kicker"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-shield-check"/></svg> Administrator workspace · Resource publishing</p>
             <div class="row row--wrap">
-              <h2>Upload a resource</h2>
-              <span class="live-chip" id="upload-mode-chip"><span class="dot"></span> <span id="upload-mode-text">Cloud publishing</span></span>
+              <h2 id="upload-page-heading">Upload a resource</h2>
+              <span class="live-chip" id="upload-mode-chip" role="status"><span class="dot"></span> <span id="upload-mode-text">Cloud publishing</span></span>
             </div>
-            <p>Add a mini app (HTML), PDF, Word document, Excel workbook, PowerPoint or any other file. Classify it by year level and topic so students can find it.</p>
+            <p>Share a resource in five clear steps. Add the file, organize its details, preview the student card, then publish when you are ready.</p>
           </div>
           <div class="band__actions">
+            <span class="upload-safe-note"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-lock"/></svg>Upload only starts when you publish in step 5.</span>
             <button type="button" class="btn btn--outline-white" data-action="go-settings">
-              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-key"/></svg> Access token
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-key"/></svg> Cloud settings
             </button>
           </div>
         </div>
       </div>
 
-      <div class="split">
+      <div class="split split--upload">
         <!-- Form column -->
-        <form class="stack" id="upload-form" novalidate>
+        <form class="stack upload-form" id="upload-form" aria-label="Upload a resource" novalidate>
           <!-- Step 1: the file -->
-          <section class="panel panel--pad">
+          <section class="panel panel--pad upload-step upload-step--file" aria-labelledby="upload-step-file-heading">
             <div class="step-head">
-              <span class="step-badge">1</span>
+              <span class="step-badge" aria-hidden="true">1</span>
               <div class="grow">
-                <h3>The file</h3>
+                <h3 id="upload-step-file-heading">Choose the file</h3>
                 <p>One file per resource — students download exactly this file.</p>
               </div>
               <span class="tag tag--indigo" id="max-size-label">Maximum 50 MB</span>
             </div>
-            <label class="dropzone" id="dropzone" for="upload-file" tabindex="0">
-              <svg class="ico ico--xl" aria-hidden="true"><use href="#i-cloud-upload"/></svg>
-              <span class="block-title text-sm">Drop the file here, or click to browse</span>
-              <span class="hint">Nothing is sent anywhere until you press <b>Upload resource</b> in step 5.</span>
+            <label class="dropzone" id="dropzone" for="upload-file" tabindex="0" role="button" aria-label="Choose a resource file: drop it here or click to browse" aria-controls="upload-file" aria-describedby="upload-file-help">
+              <span class="dropzone__icon"><svg class="ico" aria-hidden="true"><use href="#i-cloud-upload"/></svg></span>
+              <span class="dropzone__copy">
+                <span class="dropzone__title">Drag and drop your file here</span>
+                <span class="dropzone__subtitle">or click to browse from your device</span>
+                <span class="dropzone__formats">PDF · Office documents · HTML · images · audio/video · text · ZIP</span>
+              </span>
+              <span class="dropzone__action"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-folder"/></svg> Browse files</span>
               <input type="file" id="upload-file" hidden
                      accept=".html,.htm,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.zip,.png,.jpg,.jpeg,.gif,.svg,.webp,.mp4,.mp3">
             </label>
+            <p class="hint upload-file-help" id="upload-file-help"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-shield-check"/></svg><span>Nothing is uploaded until you press <b>Upload resource</b> in step 5. Drop a new file here to replace your selection.</span></p>
             <div class="dz-facts mt-3">
-              <div class="dz-fact">
-                <span class="dz-fact__label"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-target"/></svg>Size limit</span>
-                <span class="dz-fact__value">Up to <b id="dz-max-fact">50 MB</b> per file. Anything larger is rejected straight away with a clear message.</span>
-              </div>
-              <div class="dz-fact">
+              <div class="dz-fact dz-fact--formats">
                 <span class="dz-fact__label"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-file"/></svg>Accepted formats</span>
                 <span class="dz-fact__value dz-fact__value--chips">
                   <span class="tag tag--slate">HTML mini app</span>
@@ -1414,21 +1475,25 @@ table.data th.num{text-align:right}
                   <span class="tag tag--slate">Excel</span>
                   <span class="tag tag--slate">PowerPoint</span>
                   <span class="tag tag--slate">Image</span>
-                  <span class="tag tag--slate">Text / CSV</span>
+                  <span class="tag tag--slate">Text / CSV / RTF</span>
                   <span class="tag tag--slate">ZIP</span>
                   <span class="tag tag--slate">MP4 / MP3</span>
                 </span>
               </div>
               <div class="dz-fact">
+                <span class="dz-fact__label"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-target"/></svg>Size limit</span>
+                <span class="dz-fact__value">Up to <b id="dz-max-fact">50 MB</b> per file. Larger files are rejected with a clear message.</span>
+              </div>
+              <div class="dz-fact">
                 <span class="dz-fact__label"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-folder"/></svg>More than one file?</span>
-                <span class="dz-fact__value">Bundle them into a single <b>ZIP</b> first — each resource publishes exactly one file.</span>
+                <span class="dz-fact__value">Bundle them into one <b>ZIP</b> — each resource publishes a single file.</span>
               </div>
             </div>
-            <div class="picked-panel mt-3" id="picked-file-wrap" hidden>
+            <div class="picked-panel mt-3" id="picked-file-wrap" hidden aria-live="polite">
               <div class="picked-panel__head">
                 <span class="picked-panel__title">
                   <svg class="ico ico--sm" aria-hidden="true"><use href="#i-check-circle"/></svg>
-                  Chosen file — continue with step 2
+                  File selected — continue with step 2
                 </span>
                 <button type="button" class="btn btn--ghost-danger btn--sm" data-action="clear-file">
                   <svg class="ico ico--sm" aria-hidden="true"><use href="#i-x"/></svg> Remove
@@ -1447,19 +1512,19 @@ table.data th.num{text-align:right}
                   <span id="picked-size-note">0 KB of 50 MB</span>
                 </div>
                 <div class="bar__track size-meter__track"><div class="bar__fill" id="picked-size-bar"></div></div>
-                <p class="hint">Drop another file on the zone above to replace this one.</p>
+                <p class="hint">This check compares the selected file with the upload limit.</p>
               </div>
               <div class="progress" id="upload-progress" hidden><div class="progress__bar" id="upload-progress-bar"></div></div>
             </div>
-            <p class="field-error mt-2" id="file-error" hidden></p>
+            <p class="field-error mt-2" id="file-error" hidden role="alert"></p>
           </section>
 
           <!-- Step 2: core details -->
-          <section class="panel panel--pad">
+          <section class="panel panel--pad upload-step" aria-labelledby="upload-step-details-heading">
             <div class="step-head">
-              <span class="step-badge">2</span>
+              <span class="step-badge" aria-hidden="true">2</span>
               <div>
-                <h3>Resource details</h3>
+                <h3 id="upload-step-details-heading">Resource details</h3>
                 <p>The name students will see, plus a short description.</p>
               </div>
             </div>
@@ -1485,12 +1550,12 @@ table.data th.num{text-align:right}
           </section>
 
           <!-- Step 3: classification -->
-          <section class="panel panel--pad">
+          <section class="panel panel--pad upload-step" aria-labelledby="upload-step-classify-heading">
             <div class="step-head">
-              <span class="step-badge">3</span>
+              <span class="step-badge" aria-hidden="true">3</span>
               <div>
-                <h3>Classify it</h3>
-                <p>Year level and topic are required so nothing reaches the library unclassified.</p>
+                <h3 id="upload-step-classify-heading">Classify the resource</h3>
+                <p>Choose the year level, topic and type so students can find it in the library.</p>
               </div>
             </div>
             <div class="field-row">
@@ -1520,12 +1585,12 @@ table.data th.num{text-align:right}
           </section>
 
           <!-- Step 4: audience -->
-          <section class="panel panel--pad">
+          <section class="panel panel--pad upload-step" aria-labelledby="upload-step-audience-heading">
             <div class="step-head">
-              <span class="step-badge">4</span>
+              <span class="step-badge" aria-hidden="true">4</span>
               <div>
-                <h3>Who can see it</h3>
-                <p>This is a static site, so visibility is a label for students, not private access control.</p>
+                <h3 id="upload-step-audience-heading">Choose an audience</h3>
+                <p>This label helps students understand who the resource is for; it does not restrict access.</p>
               </div>
             </div>
             <div class="field">
@@ -1543,11 +1608,11 @@ table.data th.num{text-align:right}
           </section>
 
           <!-- Step 5: publish -->
-          <section class="panel panel--pad">
+          <section class="panel panel--pad upload-step" aria-labelledby="upload-step-publish-heading">
             <div class="step-head">
-              <span class="step-badge">5</span>
+              <span class="step-badge" aria-hidden="true">5</span>
               <div>
-                <h3>Publish</h3>
+                <h3 id="upload-step-publish-heading">Review and publish</h3>
                 <p id="publish-hint">Uploading to the cloud so every student device can download it.</p>
               </div>
             </div>
@@ -1573,25 +1638,25 @@ table.data th.num{text-align:right}
         </form>
 
         <!-- Preview column -->
-        <div class="sticky-col stack">
+        <aside class="sticky-col stack upload-sidebar" aria-label="Resource previews">
           <section class="panel panel--pad" aria-labelledby="card-preview-heading">
-            <div class="row row--between mb-3">
-              <h3 class="block-title text-sm" id="card-preview-heading">Live card preview</h3>
-              <span class="tag tag--indigo">Exactly how students see it</span>
+            <div class="preview-panel__head">
+              <h3 class="block-title text-sm" id="card-preview-heading">Student card preview</h3>
+              <span class="tag tag--indigo">Library card</span>
             </div>
             <div class="preview-card" id="card-preview"></div>
           </section>
 
           <section class="panel panel--pad" aria-labelledby="file-preview-heading">
-            <div class="row row--between mb-3">
+            <div class="preview-panel__head">
               <h3 class="block-title text-sm" id="file-preview-heading">File preview</h3>
               <span class="tag tag--slate" id="file-preview-kind">Waiting for a file</span>
             </div>
             <div id="file-preview-holder">
-              <p class="text-sm muted">Choose a file and a preview appears here — PDFs, images and HTML mini apps render inside a sandboxed frame.</p>
+              <p class="text-sm muted">Choose a file to preview it here. PDFs, images and HTML mini apps display in a sandboxed frame.</p>
             </div>
           </section>
-        </div>
+        </aside>
       </div>
     </div>
 
