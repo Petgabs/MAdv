@@ -418,6 +418,24 @@ table.data th.num{text-align:right}
 .dropzone .ico{color:var(--indigo-600);margin:0 auto .5rem}
 .picked-file{display:flex;align-items:center;gap:.75rem;background:#fff;border:1px solid var(--slate-200);
   border-radius:var(--radius-lg);padding:.7rem .85rem}
+.picked-file__name{font-size:.92rem;font-weight:700;overflow-wrap:anywhere}
+.picked-panel{background:var(--slate-50);border:1px solid var(--slate-200);border-radius:var(--radius-lg);padding:.75rem .85rem}
+.picked-panel__head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.6rem}
+.picked-panel__title{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:800;color:var(--slate-700)}
+.picked-panel__title .ico{color:var(--emerald-600)}
+.picked-panel .picked-file{background:#fff}
+.dz-facts{display:grid;gap:.6rem}
+@media (min-width:768px){.dz-facts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.dz-fact{background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-lg);padding:.7rem .8rem}
+.dz-fact__label{display:inline-flex;align-items:center;gap:.4rem;font-size:.66rem;font-weight:800;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--slate-500)}
+.dz-fact__label .ico{color:var(--indigo-600)}
+.dz-fact__value{display:block;margin-top:.45rem;font-size:.8rem;color:var(--slate-600);line-height:1.55}
+.dz-fact__value--chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.size-meter{margin-top:.6rem}
+.size-meter__top{display:flex;justify-content:space-between;gap:.75rem;font-size:.72rem;color:var(--slate-500);margin-bottom:.3rem}
+.size-meter__track{height:.45rem}
+.size-meter .hint{margin-top:.45rem;font-size:.7rem}
 .progress{background:var(--slate-100);border-radius:999px;height:.55rem;overflow:hidden;margin-top:.6rem}
 .progress__bar{height:100%;background:var(--indigo-600);border-radius:999px;transition:width .2s;width:0}
 .preview-card{background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-xl);padding:1.1rem;box-shadow:var(--shadow-sm)}
@@ -1367,28 +1385,67 @@ table.data th.num{text-align:right}
           <section class="panel panel--pad">
             <div class="step-head">
               <span class="step-badge">1</span>
-              <div>
+              <div class="grow">
                 <h3>The file</h3>
-                <p>Any classroom file up to <span id="max-size-label">25 MB</span>.</p>
+                <p>One file per resource — students download exactly this file.</p>
               </div>
+              <span class="tag tag--indigo" id="max-size-label">Maximum 50 MB</span>
             </div>
             <label class="dropzone" id="dropzone" for="upload-file" tabindex="0">
               <svg class="ico ico--xl" aria-hidden="true"><use href="#i-cloud-upload"/></svg>
-              <span class="block-title text-sm">Click to choose a file, or drop it here</span>
-              <span class="hint">HTML mini apps · PDF · DOC/DOCX · XLS/XLSX · PPT/PPTX · images · text · CSV · ZIP</span>
+              <span class="block-title text-sm">Drop the file here, or click to browse</span>
+              <span class="hint">Nothing is sent anywhere until you press <b>Upload resource</b> in step 5.</span>
               <input type="file" id="upload-file" hidden
                      accept=".html,.htm,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.zip,.png,.jpg,.jpeg,.gif,.svg,.webp,.mp4,.mp3">
             </label>
-            <div class="mt-3" id="picked-file-wrap" hidden>
+            <div class="dz-facts mt-3">
+              <div class="dz-fact">
+                <span class="dz-fact__label"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-target"/></svg>Size limit</span>
+                <span class="dz-fact__value">Up to <b id="dz-max-fact">50 MB</b> per file. Anything larger is rejected straight away with a clear message.</span>
+              </div>
+              <div class="dz-fact">
+                <span class="dz-fact__label"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-file"/></svg>Accepted formats</span>
+                <span class="dz-fact__value dz-fact__value--chips">
+                  <span class="tag tag--slate">HTML mini app</span>
+                  <span class="tag tag--slate">PDF</span>
+                  <span class="tag tag--slate">Word</span>
+                  <span class="tag tag--slate">Excel</span>
+                  <span class="tag tag--slate">PowerPoint</span>
+                  <span class="tag tag--slate">Image</span>
+                  <span class="tag tag--slate">Text / CSV</span>
+                  <span class="tag tag--slate">ZIP</span>
+                  <span class="tag tag--slate">MP4 / MP3</span>
+                </span>
+              </div>
+              <div class="dz-fact">
+                <span class="dz-fact__label"><svg class="ico ico--sm" aria-hidden="true"><use href="#i-folder"/></svg>More than one file?</span>
+                <span class="dz-fact__value">Bundle them into a single <b>ZIP</b> first — each resource publishes exactly one file.</span>
+              </div>
+            </div>
+            <div class="picked-panel mt-3" id="picked-file-wrap" hidden>
+              <div class="picked-panel__head">
+                <span class="picked-panel__title">
+                  <svg class="ico ico--sm" aria-hidden="true"><use href="#i-check-circle"/></svg>
+                  Chosen file — continue with step 2
+                </span>
+                <button type="button" class="btn btn--ghost-danger btn--sm" data-action="clear-file">
+                  <svg class="ico ico--sm" aria-hidden="true"><use href="#i-x"/></svg> Remove
+                </button>
+              </div>
               <div class="picked-file">
                 <span class="rcard__icon file-icon--other" id="picked-icon"><svg class="ico" aria-hidden="true"><use href="#i-file"/></svg></span>
                 <div class="grow">
-                  <p class="text-sm" style="font-weight:700" id="picked-name">file.pdf</p>
+                  <p class="picked-file__name" id="picked-name">file.pdf</p>
                   <p class="hint" id="picked-size">0 KB</p>
                 </div>
-                <button type="button" class="btn btn--ghost-danger btn--icon" data-action="clear-file" aria-label="Remove the chosen file">
-                  <svg class="ico ico--sm" aria-hidden="true"><use href="#i-x"/></svg>
-                </button>
+              </div>
+              <div class="size-meter">
+                <div class="size-meter__top">
+                  <span>Size check</span>
+                  <span id="picked-size-note">0 KB of 50 MB</span>
+                </div>
+                <div class="bar__track size-meter__track"><div class="bar__fill" id="picked-size-bar"></div></div>
+                <p class="hint">Drop another file on the zone above to replace this one.</p>
               </div>
               <div class="progress" id="upload-progress" hidden><div class="progress__bar" id="upload-progress-bar"></div></div>
             </div>
@@ -1725,7 +1782,8 @@ table.data th.num{text-align:right}
               </div>
               <div class="field">
                 <label for="opt-max-size">Maximum upload size (MB)</label>
-                <input class="input" id="opt-max-size" type="number" min="1" max="95" step="1" value="25">
+                <input class="input" id="opt-max-size" type="number" min="1" max="50" step="1" value="50">
+                <p class="hint">Between 1 and 50 MB per file — 50 MB is the fixed ceiling.</p>
               </div>
             </div>
             <div class="field-row">
@@ -1863,6 +1921,9 @@ table.data th.num{text-align:right}
 var APP_VERSION   = 'v2.3.0';
 var SUBJECT       = 'Mathematics Advanced';
 var DEFAULT_ADMIN = { user: 'peter82', pass: 'petgabs82' };
+// One uploaded file is capped at 50 MB. Teachers can lower the limit in Cloud
+// settings, but it can never be raised past this ceiling.
+var UPLOAD_MAX_MB = 50;
 var DEFAULT_YEARS = ['Year 9', 'Year 10', 'Year 11', 'Year 12'];
 var CATEGORIES    = [
   'Homework',
@@ -1945,7 +2006,7 @@ var DEFAULT_SETTINGS = {
   showBlockedMessage: true,
   defaultOwner: '',
   department: 'Mathematics',
-  maxSizeMB: 25,
+  maxSizeMB: UPLOAD_MAX_MB,
   school: 'Mathematics Faculty',
   years: DEFAULT_YEARS.slice(),
   adminUser: DEFAULT_ADMIN.user,
@@ -2036,6 +2097,18 @@ var state = {
 // The download policy is fixed: a visitor must register/sign in as a student and
 // download from their own My learning page. An old saved setting cannot relax it.
 state.settings.requireLogin = true;
+// The upload ceiling is 50 MB in this version. Devices still holding the retired
+// 25 MB default — or a value saved above the new cap — move onto the new limit.
+(function () {
+  var saved = Number(state.settings.maxSizeMB);
+  state.settings.maxSizeMB = (!saved || saved === 25 || saved > UPLOAD_MAX_MB)
+    ? UPLOAD_MAX_MB
+    : Math.max(1, Math.min(UPLOAD_MAX_MB, saved));
+})();
+// The one authoritative upload limit used everywhere (validation, labels, settings).
+function uploadLimitMB() {
+  return Math.max(1, Math.min(UPLOAD_MAX_MB, Number(state.settings.maxSizeMB) || UPLOAD_MAX_MB));
+}
 
 function saveSettings() { store.set(KEYS.settings, state.settings); }
 function saveStudents() { store.set(KEYS.students, state.students); }
@@ -5564,20 +5637,20 @@ function openPreview(id) {
 
 /* ------------------------------ Uploads ---------------------------------- */
 function validateFile(file) {
-  var maxMB = Number(state.settings.maxSizeMB) || 25;
+  var maxMB = uploadLimitMB();
   var ext = extOf(file.name);
   if (!EXT_KIND[ext]) {
     return 'That file type is not supported. Use HTML, PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, text, CSV, image or ZIP files.';
   }
   if (file.size > maxMB * 1024 * 1024) {
-    return 'That file is ' + formatBytes(file.size) + '. The maximum is ' + maxMB + ' MB — compress it or raise the limit in Cloud settings.';
+    return 'That file is ' + formatBytes(file.size) + '. The maximum is ' + maxMB + ' MB — compress it, split it, or bundle it into a ZIP.';
   }
   return '';
 }
 function pickFile(file) {
-  state.picked = null;
   var error = $('#file-error');
   if (!file) {
+    state.picked = null;
     if (error) { error.hidden = true; error.textContent = ''; }
     var wrap = $('#picked-file-wrap');
     if (wrap) wrap.hidden = true;
@@ -5586,9 +5659,12 @@ function pickFile(file) {
   }
   var problem = validateFile(file);
   if (problem) {
+    // A rejected drop leaves the previously chosen file selected, so the panel
+    // never shows a file that is no longer the one that will be uploaded.
     if (error) { error.hidden = false; error.textContent = problem; }
     toast(problem, 'error');
     var inp = $('#upload-file'); if (inp) inp.value = '';
+    updateSizeMeter(state.picked);
     return;
   }
   if (error) { error.hidden = true; error.textContent = ''; }
@@ -5596,7 +5672,8 @@ function pickFile(file) {
   var ext = extOf(file.name);
   $('#picked-file-wrap').hidden = false;
   $('#picked-name').textContent = file.name;
-  $('#picked-size').textContent = formatBytes(file.size) + ' · ' + (EXT_KIND[ext] === 'app' ? 'HTML mini app' : 'Document');
+  $('#picked-size').textContent = EXT_KIND[ext] === 'app' ? 'HTML mini app' : ext.toUpperCase() + ' file';
+  updateSizeMeter(file);
   var icon = $('#picked-icon');
   icon.className = 'rcard__icon ' + fileIconClass(ext);
   icon.innerHTML = svgIcon(fileIconName(ext));
@@ -5622,6 +5699,17 @@ function pickFile(file) {
     if (TOPICS.indexOf(t) < 0) { topicEl.value = 'Other'; toggleOtherTopic(true); $('#up-topic-other').value = t; }
     else topicEl.value = t;
   }
+}
+// Keeps the size-check meter in step 1 in sync with the chosen file and the limit.
+function updateSizeMeter(file) {
+  var note = $('#picked-size-note');
+  var bar = $('#picked-size-bar');
+  if (!note || !bar || !file) return;
+  var maxMB = uploadLimitMB();
+  var pct = Math.max(2, Math.min(100, Math.round((file.size / (maxMB * 1024 * 1024)) * 100)));
+  note.textContent = formatBytes(file.size) + ' of ' + maxMB + ' MB — ' + (pct >= 75 ? 'close to the limit' : 'within the limit');
+  bar.style.width = pct + '%';
+  bar.className = 'bar__fill' + (pct >= 75 ? ' bar__fill--amber' : ' bar__fill--emerald');
 }
 function showFilePreview(file) {
   var holder = $('#file-preview-holder');
@@ -5882,7 +5970,7 @@ function saveOptions() {
   state.settings.requireLogin = true;
   state.settings.showBlockedMessage = $('#opt-blocked-copy').checked;
   state.settings.defaultOwner = $('#opt-default-owner').value.trim();
-  state.settings.maxSizeMB = Math.max(1, Math.min(95, Number($('#opt-max-size').value) || 25));
+  state.settings.maxSizeMB = Math.max(1, Math.min(UPLOAD_MAX_MB, Number($('#opt-max-size').value) || UPLOAD_MAX_MB));
   state.settings.school = $('#opt-school').value.trim();
   var years = $('#opt-year-list').value.split(',').map(function (y) { return y.trim(); }).filter(Boolean);
   state.settings.years = years.length ? years : DEFAULT_YEARS.slice();
@@ -5923,8 +6011,11 @@ function updateUploadMode() {
   if (hint) hint.textContent = canCloud
     ? 'The file is committed to ' + state.settings.repo + ' and listed in library.json, so every student device can download it.'
     : 'Without an access token the file stays in this browser only. Add one in Cloud settings to publish for students.';
+  var maxMB = uploadLimitMB();
   var maxLabel = $('#max-size-label');
-  if (maxLabel) maxLabel.textContent = (state.settings.maxSizeMB || 25) + ' MB';
+  if (maxLabel) maxLabel.textContent = 'Maximum ' + maxMB + ' MB';
+  var maxFact = $('#dz-max-fact');
+  if (maxFact) maxFact.textContent = maxMB + ' MB';
 }
 function cloudSyncNow(silent) {
   var repo = repoParts();
@@ -6206,12 +6297,11 @@ function openAdminAuth() {
 function renderAdminAuth() {
   var body = '<form id="admin-login-form" novalidate>' +
     '<div class="field"><label for="aa-user">Administrator username</label>' +
-      '<input class="input" id="aa-user" autocomplete="username" placeholder="peter82" required></div>' +
+      '<input class="input" id="aa-user" autocomplete="username" placeholder="Your admin username" required></div>' +
     '<div class="field"><label for="aa-pass">Password</label>' +
       '<input class="input" id="aa-pass" type="password" autocomplete="current-password" placeholder="Your admin password" required></div>' +
     (state.adminAuthError ? '<p class="field-error">' + esc(state.adminAuthError) + '</p>' : '') +
     '<button type="submit" class="btn btn--primary btn--block btn--lg">' + svgIcon('shield', 'ico--sm') + ' Sign in as admin</button>' +
-    '<p class="hint mt-3">Default credentials are <b>peter82</b> / <b>petgabs82</b>. They can be changed in Cloud settings on this device.</p>' +
   '</form>';
   if (!modalStack.length) {
     openModal({
@@ -6405,7 +6495,7 @@ function openHelp() {
         '<li>Open <b>My learning</b> and download your homework, worksheets, practice and revision materials from there.</li>' +
         '<li>Every download is recorded for your teacher with the file and the time, and counted in your own Abacus counter.</li></ol></div>' +
       '<div><h3 class="block-title text-sm mb-2">For the teacher</h3><ol class="text-sm muted" style="list-style:decimal;padding-left:1.1rem;display:grid;gap:.4rem">' +
-        '<li>Sign in as admin (default <b>peter82</b> / <b>petgabs82</b>).</li>' +
+        '<li>Sign in as admin with your administrator account.</li>' +
         '<li>Save a GitHub access token in <b>Cloud settings</b>.</li>' +
         '<li>Upload resources with a year level, topic and resource type.</li>' +
         '<li>Monitor registrations, visits and downloads in the dashboard.</li>' +
