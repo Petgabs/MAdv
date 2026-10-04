@@ -2,18 +2,154 @@
   "_comment": "Mirror of the shared backend (Supabase), written automatically by .github/workflows/cloud-sync.yml. Public: holds names, usernames and counts, never passwords.",
   "source": "shared-backend",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T10:38:55Z",
+  "updatedAt": "2026-10-04T12:29:34Z",
   "counters": {
     "day": "2026-10-04",
-    "daily": {},
-    "visits": 0,
-    "downloads": 0,
-    "visitsToday": 0,
-    "downloadsToday": 0,
-    "uniqueVisitors": 0
+    "daily": {
+      "2026-10-04": {
+        "visits": 3,
+        "downloads": 5
+      }
+    },
+    "visits": 3,
+    "downloads": 5,
+    "visitsToday": 3,
+    "downloadsToday": 5,
+    "uniqueVisitors": 2
   },
-  "students": [],
-  "logins": [],
-  "downloads": [],
-  "visits": []
+  "students": [
+    {
+      "id": "6202f1b3-67e0-4b6c-8bc3-af877289fa9b",
+      "year": "Year 12",
+      "notes": "",
+      "status": "active",
+      "clientId": "stu_mutowja573sd2j",
+      "username": "peter",
+      "firstName": "Peter",
+      "lastVisit": "2026-10-04T10:40:59Z",
+      "visitCount": 0,
+      "registeredAt": "2026-10-04T10:40:59Z",
+      "downloadCount": 0,
+      "passwordRule": "username + year number (kept in the shared backend)"
+    },
+    {
+      "id": "9645e423-e6f0-4f97-b6f1-bf7d30cd6472",
+      "year": "Year 11",
+      "notes": "",
+      "status": "active",
+      "clientId": "stu_mutr1rxledhcqy",
+      "username": "liam",
+      "firstName": "Liam",
+      "lastVisit": "2026-10-04T11:41:30Z",
+      "visitCount": 0,
+      "registeredAt": "2026-10-04T11:41:03Z",
+      "downloadCount": 1,
+      "passwordRule": "username + year number (kept in the shared backend)"
+    }
+  ],
+  "logins": [
+    {
+      "at": "2026-10-04T11:41:03Z",
+      "ok": true,
+      "kind": "Registration",
+      "name": "Liam",
+      "year": "Year 11",
+      "studentId": "stu_mutr1rxledhcqy"
+    },
+    {
+      "at": "2026-10-04T10:40:59Z",
+      "ok": true,
+      "kind": "Registration",
+      "name": "Peter",
+      "year": "Year 12",
+      "studentId": "stu_mutowja573sd2j"
+    }
+  ],
+  "downloads": [
+    {
+      "at": "2026-10-04T11:40:59Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": "stu_mutr1rxledhcqy",
+      "resourceId": "res_musdpxrldfjk50",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Liam",
+      "studentYear": "Year 11"
+    },
+    {
+      "at": "2026-10-04T11:23:35Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": null,
+      "resourceId": "res_musdpe0cjuawqo",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Guest",
+      "studentYear": null
+    },
+    {
+      "at": "2026-10-04T11:10:22Z",
+      "year": "Year 11",
+      "title": "Baulkham Hills 2026 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Baulkham Hills 2026 w. sol.pdf",
+      "studentId": null,
+      "resourceId": "res_mutk5gn3wmz5xq",
+      "resourceKey": "path:resources/Year 11/Baulkham Hills 2026 w. sol.pdf",
+      "studentName": "Guest",
+      "studentYear": null
+    },
+    {
+      "at": "2026-10-04T11:10:11Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentId": null,
+      "resourceId": "res_musdpe0cjuawqo",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_Topic_MCQ_Practice (1) (2).html",
+      "studentName": "Guest",
+      "studentYear": null
+    },
+    {
+      "at": "2026-10-04T10:41:31Z",
+      "year": "Year 11",
+      "title": "Knox 2025 W. Sol",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Knox 2025 w. sol.pdf",
+      "studentId": "stu_musdqg2u0vdgcg",
+      "resourceId": "res_mutjy5znm0jowv",
+      "resourceKey": "path:resources/Year 11/Knox 2025 w. sol.pdf",
+      "studentName": "Peter",
+      "studentYear": "Year 12"
+    }
+  ],
+  "visits": [
+    {
+      "at": "2026-10-04T12:07:14Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T11:40:51Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
+    {
+      "at": "2026-10-04T11:23:27Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    }
+  ]
 }
