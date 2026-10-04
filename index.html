@@ -1073,7 +1073,7 @@ table.data th.num{text-align:right}
               <svg class="ico ico--sm" aria-hidden="true"><use href="#i-refresh"/></svg> Refresh site
             </button>
             <button type="button" class="btn btn--outline-white" data-action="sync-cloud">
-              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-cloud-download"/></svg> Sync from cloud
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-cloud-download"/></svg> Refresh live data
             </button>
             <button type="button" class="btn btn--white" data-action="go-upload">
               <svg class="ico ico--sm" aria-hidden="true"><use href="#i-upload"/></svg> Upload resource
@@ -1132,7 +1132,7 @@ table.data th.num{text-align:right}
         <div class="panel__head">
           <div>
             <h3 id="students-heading">Student register &amp; monitoring</h3>
-            <p>Every registered student, with the username and password the system issued, their last visit, visit count and download history.</p>
+            <p>Live shared register: names, issued credentials, year levels, visits and downloads. It refreshes when the admin dashboard opens, returns to focus, or you choose “Refresh live data”.</p>
           </div>
           <div class="toolbar-inline">
             <button type="button" class="btn btn--subtle btn--sm" data-action="toggle-passwords">
@@ -1533,7 +1533,7 @@ table.data th.num{text-align:right}
         <div class="notice notice--warn mb-6">
           <svg class="ico ico--sm" aria-hidden="true"><use href="#i-shield-check"/></svg>
           <div>
-            <b>How sharing works:</b> shared visitor and file-download totals use the public Abacus counter API, so they work without a key or a server in this repository. Supabase below is optional and handles student registration, sign-in and the detailed student activity log. A GitHub Action can mirror the shared register into <code>data/cloud-data.json</code>. The GitHub token saved here only publishes files; it is never shared with visitors.
+            <b>How sharing works:</b> shared visitor and file-download totals use the public Abacus counter API. Online student registration requires the Supabase shared register below; registrations are confirmed only after they are stored there. The admin dashboard reads the live register, and a GitHub Action mirrors a password-free roster snapshot into <code>data/cloud-data.json</code>. The GitHub token saved here only publishes files; it is never shared with students.
           </div>
         </div>
 
@@ -1642,8 +1642,8 @@ table.data th.num{text-align:right}
         <section class="panel mb-6" aria-labelledby="sync-heading">
           <div class="panel__head">
             <div>
-              <h3 id="sync-heading">Shared cloud sync <span class="tag tag--emerald">Supabase</span></h3>
-              <p>Optionally share student registration, sign-in and the detailed student activity log. Site-wide visitor and file-download totals use Abacus independently.</p>
+              <h3 id="sync-heading">Shared student register <span class="tag tag--emerald">Supabase</span></h3>
+              <p>Required for online student registration and cross-device sign-in. The admin dashboard reads registrations live; site-wide visitor and file-download totals use Abacus independently.</p>
             </div>
             <span class="tag" id="sync-status">Not configured</span>
           </div>
@@ -1900,7 +1900,8 @@ var KEYS = {
   token: 'madv.token.v2',
   pendingSync: 'madv.pending-sync.v1',
   pendingAbacus: 'madv.abacus-pending.v1',
-  syncConfig: 'madv.sync-config.v1'
+  syncConfig: 'madv.sync-config.v1',
+  registrationAttempt: 'madv.registration-attempt.v1'
 };
 var DEFAULT_SETTINGS = {
   repo: '',
@@ -1986,7 +1987,8 @@ var state = {
   cloud: { repo: '', branch: 'main', token: '', sessionOnly: false, librarySha: null, dataSha: null,
            lastSync: null, online: true, error: '', checked: false, login: '' },
   sync: { provider: 'supabase', url: '', key: '', loaded: false, loading: null, status: 'off',
-          lastSync: null, rosterAt: null, error: '', pending: 0, flushing: false, fromRepo: false },
+          lastSync: null, rosterAt: null, rosterLoading: false, rosterPromise: null,
+          error: '', pending: 0, flushing: false, fromRepo: false },
   abacus: { status: 'checking', lastSync: null, error: '', pending: 0, loading: null, flushing: false,
             initialized: { visits: false, downloads: false, files: {} }, inFlight: { visits: 0, downloads: 0, files: {} },
             fileTotals: {}, fileLoads: {}, fileFetchedAt: {} },
@@ -1997,7 +1999,7 @@ var state = {
   showPasswords: true,
   expandedStudent: null,
   picked: null,
-  authModal: { tab: 'login', error: '', notice: '', result: null },
+  authModal: { tab: 'login', error: '', notice: '', result: null, registrationCheckFailed: false },
   adminAuthError: '',
   busy: false,
   transport: 'device'   // 'cloud' when the repository is reachable
@@ -2551,7 +2553,7 @@ function recordVisit() {
     logEvent('visits', { at: at, studentId: null, name: state.session && state.session.role === 'admin' ? 'Administrator' : 'Visitor', year: '' });
   }
   saveCounters();
-  // Abacus counts site-wide visits independently of the optional student backend.
+  // Abacus counts site-wide visits independently of the shared student backend.
   var abacusEvent = countAbacusVisit();
   // Keep the Supabase activity log and per-student visit history when configured.
   if (repoParts()) {
@@ -2627,63 +2629,61 @@ function validateRegistration(firstName, year) {
   if (!year) throw new Error('Please choose a year level.');
   if (!state.settings.openRegistration) throw new Error('Self-registration is currently closed. Please ask your teacher to add you.');
 }
-// Registers in the shared backend when it is reachable, otherwise on this
-// device only. The result tells the caller where the account landed.
+function registrationAttemptId(firstName, year) {
+  var key = String(firstName || '').toLowerCase() + '|' + String(year || '');
+  var pending = store.get(KEYS.registrationAttempt, null);
+  if (pending && pending.key === key && pending.clientId) return pending.clientId;
+  var clientId = uid('stu');
+  // Reuse the id after a network timeout: the database treats client_id as an
+  // idempotency key, so a retry cannot accidentally create a second account.
+  store.set(KEYS.registrationAttempt, { key: key, clientId: clientId, at: new Date().toISOString() });
+  return clientId;
+}
+function clearRegistrationAttempt(clientId) {
+  var pending = store.get(KEYS.registrationAttempt, null);
+  if (!clientId || (pending && pending.clientId === clientId)) store.remove(KEYS.registrationAttempt);
+}
+function onlineRegistrationUnavailable() {
+  return new Error('Online student registration is not configured on this site. Please ask your teacher to connect the shared student register. No account was created.');
+}
+// Student accounts must be committed to the shared backend before credentials
+// are issued. A device-local or queued account is not a completed registration:
+// it cannot reliably be used on another device or appear in the admin roster.
 function registerStudent(firstName, year) {
   firstName = String(firstName || '').trim().replace(/\s+/g, ' ');
   validateRegistration(firstName, year);
-  var clientId = uid('stu');
 
-  function localStudent() {
-    var username = uniqueUsername(firstName);
-    var password = makePassword(username, year);
-    var now = new Date().toISOString();
-    var student = {
-      id: clientId,
-      firstName: titleCase(firstName),
-      username: username,
-      password: password,
-      year: year,
-      registeredAt: now,
-      firstVisit: now,
-      lastVisit: now,
-      visitCount: 0,
-      downloadCount: 0,
-      downloads: [],
-      status: 'active',
-      device: deviceId(),
-      notes: ''
-    };
-    state.students.push(student);
-    saveStudents();
-    logEvent('logins', { at: now, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Registration' });
-    state.session = { role: 'student', studentId: student.id, at: now };
-    saveSession();
-    return student;
-  }
-
-  if (!syncActive()) return Promise.resolve({ student: localStudent(), shared: false });
-
-  return syncRegister(firstName, year, clientId).then(function (result) {
-    var student = result.student;
-    if (!student) return { student: localStudent(), shared: false };
-    var now = new Date().toISOString();
-    logEvent('logins', { at: now, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Registration' });
-    state.session = { role: 'student', studentId: student.id, at: now };
-    saveSession();
-    renderAll();
-    return { student: student, shared: true, already: result.already };
-  }, function (err) {
-    // Validation problems (registration closed, invalid name) are final;
-    // connection problems fall back to this device and are queued to sync.
-    if (err && err.fatal) throw err;
-    var student = localStudent();
-    syncQueueAdd({
-      name: 'madv_register',
-      studentId: student.id,
-      payload: { p_first_name: firstName, p_year: year, p_client_id: clientId }
+  return loadSyncConfig().then(function () {
+    if (!syncActive()) throw onlineRegistrationUnavailable();
+    var clientId = registrationAttemptId(firstName, year);
+    return syncRegister(firstName, year, clientId).then(function (result) {
+      var student = result && result.student;
+      if (!student) throw new Error('The shared register did not issue an account. Please retry.');
+      clearRegistrationAttempt(clientId);
+      var now = new Date().toISOString();
+      logEvent('logins', { at: now, studentId: student.id, name: student.firstName, year: student.year, ok: true, kind: 'Registration' });
+      state.session = { role: 'student', studentId: student.id, at: now };
+      saveSession();
+      state.sync.status = 'ok';
+      state.sync.lastSync = now;
+      state.sync.error = '';
+      renderAll();
+      return { student: student, shared: true, already: !!result.already };
+    }).catch(function (err) {
+      if (err && err.fatal) {
+        clearRegistrationAttempt(clientId);
+        state.sync.status = 'error';
+        state.sync.error = err.message;
+        throw err;
+      }
+      state.sync.status = 'error';
+      state.sync.error = err && err.message ? err.message : 'The shared register could not be reached.';
+      renderSettings();
+      var unavailable = new Error('The shared student register could not confirm your account. No credentials were issued. Check your connection and retry; the same registration request will be safely resumed.');
+      unavailable.cause = err;
+      unavailable.offline = true;
+      throw unavailable;
     });
-    return { student: student, shared: false, offline: true, error: err ? err.message : '' };
   });
 }
 function loginStudentLocally(u, p, at) {
@@ -3051,7 +3051,7 @@ function syncRpc(name, payload, options) {
   }).catch(function (err) {
     if (err && err.fatal) throw err;
     if (err && err.name === 'AbortError') {
-      var slow = new Error('The shared backend did not answer in time — the change was saved on this device.');
+      var slow = new Error('The shared backend did not answer in time. Check the connection before retrying; this request may not have completed.');
       slow.offline = true;
       throw slow;
     }
@@ -3170,8 +3170,13 @@ function syncApplyQueued(entry, data) {
 /* Mapping between backend rows and local student records --------------- */
 function studentFromRow(row) {
   if (!row || !row.username) return null;
-  var clientId = row.clientId || row.client_id || uid('stu');
-  var existing = state.students.filter(function (s) { return s.id === clientId; })[0];
+  var suppliedClientId = row.clientId || row.client_id || '';
+  var usernameKey = String(row.username || '').toLowerCase();
+  var existing = state.students.filter(function (s) {
+    return (suppliedClientId && s.id === suppliedClientId) || (row.id && s.cloudId === row.id) ||
+      (usernameKey && String(s.username || '').toLowerCase() === usernameKey);
+  })[0];
+  var clientId = suppliedClientId || (existing && existing.id) || row.id || uid('stu');
   var student = existing || {
     id: clientId,
     downloads: [],
@@ -3321,7 +3326,9 @@ function syncStats() {
 }
 function syncPullRoster() {
   if (!syncActive() || !currentAdmin()) return Promise.resolve(null);
-  return syncRpc('madv_admin_export', {
+  if (state.sync.rosterPromise) return state.sync.rosterPromise;
+  state.sync.rosterLoading = true;
+  var request = syncRpc('madv_admin_export', {
     p_admin_user: state.settings.adminUser || '',
     p_admin_pass: state.settings.adminPass || '',
     p_day: todayKey()
@@ -3331,17 +3338,26 @@ function syncPullRoster() {
       refused.fatal = true;
       throw refused;
     }
-    var added = mergeCloudData(snapshot);
+    var added = mergeCloudData(snapshot, true);
     state.sync.rosterAt = new Date().toISOString();
     state.sync.status = 'ok';
     state.sync.error = '';
     renderAll();
     return added;
+  });
+  state.sync.rosterPromise = request.then(function (added) {
+    state.sync.rosterLoading = false;
+    state.sync.rosterPromise = null;
+    return added;
   }, function (err) {
-    state.sync.error = err.message;
-    renderSettings();
+    state.sync.rosterLoading = false;
+    state.sync.rosterPromise = null;
+    state.sync.status = 'error';
+    state.sync.error = err.message || 'The shared register could not be read.';
+    renderAll();
     return null;
   });
+  return state.sync.rosterPromise;
 }
 function syncAdminStudent(action, student) {
   if (!syncActive() || !student) return Promise.resolve(null);
@@ -3389,6 +3405,36 @@ function syncNow(silent) {
       return !!stats;
     });
   });
+}
+function refreshAdminData(silent) {
+  if (!currentAdmin()) return Promise.resolve(false);
+  return loadSyncConfig().then(function () {
+    // Refresh the public repository mirror/library first, then overlay it with
+    // the authoritative live roster so a stale mirror cannot hide new accounts.
+    return cloudSyncNow(true);
+  }).then(function () {
+    if (!syncActive()) {
+      if (!silent) toast('The live student register is not connected. Online registration remains unavailable until the shared backend is configured.', 'warn');
+      return false;
+    }
+    state.sync.status = 'syncing';
+    renderDashboard();
+    return syncQueueFlush().then(function () {
+      return Promise.all([syncStats(), syncPullRoster()]);
+    }).then(function (results) {
+      var rosterLoaded = results[1] !== null;
+      if (!silent) toast(rosterLoaded
+        ? 'Live student register refreshed from the shared backend.'
+        : 'The live student register could not be refreshed. Check the shared backend status above.', rosterLoaded ? 'success' : 'warn');
+      return rosterLoaded;
+    });
+  });
+}
+function openAdminDashboard(silent) {
+  if (!currentAdmin()) { openAdminAuth(); return Promise.resolve(false); }
+  showView('dashboard');
+  renderDashboard();
+  return refreshAdminData(silent !== false);
 }
 function testSyncConnection() {
   if (!syncReady()) { toast('Save the Supabase project URL and publishable key first.', 'warn'); return; }
@@ -3840,9 +3886,10 @@ function cloudDataPayload() {
     visits: (state.logs.visits || []).slice(0, 400).map(withRoster ? function (e) { return e; } : stripNames)
   };
 }
-function mergeCloudData(remote) {
+function mergeCloudData(remote, authoritativeRoster) {
   if (!remote || typeof remote !== 'object') return 0;
   var added = 0, changed = false;
+  var remoteStudentIds = {}, remoteStudentNames = {};
   var c = remote.counters || {};
   // The public cloud-data snapshot is only a legacy fallback. All-time visitor
   // and download totals now come from Abacus, so an older snapshot must not
@@ -3865,11 +3912,43 @@ function mergeCloudData(remote) {
   if (Array.isArray(remote.students)) {
     remote.students.forEach(function (rs) {
       if (!rs || (!rs.username && !rs.id)) return;
+      var clientId = rs.clientId || rs.client_id || '';
+      var usernameKey = String(rs.username || '').toLowerCase();
+      if (clientId) remoteStudentIds[clientId] = true;
+      if (rs.id) remoteStudentIds[rs.id] = true;
+      if (usernameKey) remoteStudentNames[usernameKey] = true;
       var local = state.students.filter(function (s) {
-        return (rs.clientId && s.id === rs.clientId) || s.id === rs.id || (rs.username && s.username === rs.username);
+        return (clientId && s.id === clientId) || s.id === rs.id || (rs.id && s.cloudId === rs.id) ||
+          (usernameKey && String(s.username || '').toLowerCase() === usernameKey);
       })[0];
       if (!local) {
         if (studentFromRow(rs)) { added++; changed = true; }
+      } else if (authoritativeRoster) {
+        // The live database is canonical. Update credentials/status/counts and
+        // remove stale shared rows after the snapshot is applied.
+        var canonical = {
+          firstName: rs.firstName || rs.first_name || local.firstName,
+          username: rs.username || local.username,
+          password: rs.password || local.password,
+          year: rs.year || local.year,
+          status: rs.status || local.status || 'active',
+          notes: rs.notes !== undefined && rs.notes !== null ? rs.notes : local.notes,
+          registeredAt: rs.registeredAt || local.registeredAt,
+          lastVisit: rs.lastVisit || null,
+          visitCount: typeof rs.visitCount === 'number' ? rs.visitCount : (local.visitCount || 0),
+          downloadCount: typeof rs.downloadCount === 'number' ? rs.downloadCount : (local.downloadCount || 0)
+        };
+        Object.keys(canonical).forEach(function (key) {
+          if (local[key] !== canonical[key]) { local[key] = canonical[key]; changed = true; }
+        });
+        if (rs.id && local.cloudId !== rs.id) { local.cloudId = rs.id; changed = true; }
+        local.syncedAt = new Date().toISOString();
+        var seen = {};
+        (local.downloads || []).forEach(function (d) { seen[d.at + '|' + d.resourceId] = true; });
+        (rs.downloads || []).forEach(function (d) {
+          if (!seen[d.at + '|' + d.resourceId]) { local.downloads.push(d); changed = true; }
+        });
+        local.downloads.sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
       } else {
         local.visitCount = Math.max(local.visitCount || 0, rs.visitCount || 0);
         local.downloadCount = Math.max(local.downloadCount || 0, rs.downloadCount || 0);
@@ -3877,14 +3956,28 @@ function mergeCloudData(remote) {
         if (rs.registeredAt && !local.registeredAt) local.registeredAt = rs.registeredAt;
         if (rs.year && !local.year) local.year = rs.year;
         if (rs.password && !local.password) local.password = rs.password;
-        var seen = {};
-        (local.downloads || []).forEach(function (d) { seen[d.at + '|' + d.resourceId] = true; });
+        var seenLegacy = {};
+        (local.downloads || []).forEach(function (d) { seenLegacy[d.at + '|' + d.resourceId] = true; });
         (rs.downloads || []).forEach(function (d) {
-          if (!seen[d.at + '|' + d.resourceId]) { local.downloads.push(d); changed = true; }
+          if (!seenLegacy[d.at + '|' + d.resourceId]) { local.downloads.push(d); changed = true; }
         });
         local.downloads.sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
       }
     });
+    if (authoritativeRoster) {
+      state.students = state.students.filter(function (student) {
+        if (!student.syncedAt) return true; // retain legacy/offline-only records for later recovery
+        var keep = remoteStudentIds[student.id] || remoteStudentIds[student.cloudId] ||
+          remoteStudentNames[String(student.username || '').toLowerCase()];
+        if (keep) return true;
+        changed = true;
+        if (state.session && state.session.role === 'student' && state.session.studentId === student.id) {
+          state.session = null;
+          saveSession();
+        }
+        return false;
+      });
+    }
   }
   ['logins', 'downloads', 'visits'].forEach(function (bucket) {
     if (!Array.isArray(remote[bucket])) return;
@@ -4401,7 +4494,7 @@ function renderDashboard() {
       ? (state.settings.syncEnabled === false ? 'student backend configured but disabled on this device' : 'student backend configured') +
         (state.sync.lastSync ? ' · synced ' + esc(relativeTime(state.sync.lastSync)) : '') +
         (state.sync.rosterAt ? ' · register pulled ' + esc(relativeTime(state.sync.rosterAt)) : '')
-      : '<b>student backend not configured</b> — registration and student activity stay on this device');
+      : '<b>student backend not configured</b> — online registration is unavailable; no new account can be created');
     if (syncReady() && state.sync.pending) pieces.push(esc(state.sync.pending) + ' student change(s) waiting to sync');
     if (state.sync.error) pieces.push('<b>' + esc(state.sync.error) + '</b>');
     if (state.cloud.error) pieces.push('<b>' + esc(state.cloud.error) + '</b>');
@@ -4735,8 +4828,7 @@ function renderSettings() {
 }
 function syncHintHtml() {
   if (!syncReady()) {
-    return 'Not configured: student registration, sign-in and detailed student activity stay on each device. ' +
-      'The visitor and published-file download totals are still shared through Abacus. To share student accounts, create the free Supabase project, run <code>backends/supabase/schema.sql</code> and paste the project URL and publishable key above.';
+    return 'Not configured: online student registration is disabled and no local-only account will be issued. The visitor and published-file download totals are still shared through Abacus. To enable accounts, create the Supabase project, run <code>backends/supabase/schema.sql</code>, then save its project URL and publishable key above. The admin page will read the live roster; the GitHub Action mirrors a password-free snapshot hourly.';
   }
   var parts = [];
   parts.push(state.sync.fromRepo ? 'Configuration loaded from <code>data/sync-config.json</code>.' : 'Configuration saved on this device.');
@@ -5480,6 +5572,7 @@ function openStudentAuth(tab) {
   state.authModal.error = '';
   state.authModal.notice = '';
   state.authModal.result = null;
+  state.authModal.registrationCheckFailed = false;
   renderStudentAuth();
 }
 function renderStudentAuth() {
@@ -5493,9 +5586,7 @@ function renderStudentAuth() {
           '<div><dt>Username</dt><dd>' + esc(auth.result.username) + '</dd></div>' +
           '<div><dt>Password</dt><dd>' + esc(auth.result.password) + '</dd></div>' +
           '<div><dt>Year level</dt><dd>' + esc(auth.result.year) + '</dd></div>' +
-        '</dl><p class="note">Write these down or copy them now. The password is your username followed by your year number. ' +
-          (auth.result.shared ? 'Your account is already saved in the shared cloud, so you can sign in from any device.'
-                              : 'This device is offline, so the account is saved here first and added to the shared cloud automatically.') + '</p>' +
+        '</dl><p class="note">Write these down or copy them now. The password is your username followed by your year number. Your account has been saved to the shared student register, so you can sign in from any device.</p>' +
       '</div>' +
       '<button type="button" class="btn btn--dark btn--block mt-3" data-action="copy-credentials">' + svgIcon('copy', 'ico--sm') + ' Copy my sign-in details</button>' +
       '<button type="button" class="btn btn--primary btn--block mt-2" data-action="go-my-learning">' + svgIcon('book', 'ico--sm') + ' Go to my learning</button>';
@@ -5510,9 +5601,9 @@ function renderStudentAuth() {
           '<input class="input" id="sa-user" autocomplete="username" placeholder="e.g. peter" required></div>' +
         '<div class="field"><label for="sa-pass">Password</label>' +
           '<input class="input" id="sa-pass" type="password" autocomplete="current-password" placeholder="e.g. peter11" required></div>' +
-        '<p class="hint">Your password is your username followed by your year level number (peter + 11 → peter11). ' + (syncReady()
+        '<p class="hint">Your password is your username followed by your year level number (peter + 11 → peter11). ' + (syncActive()
           ? 'Accounts are shared, so you can sign in here from any device.'
-          : 'On this site accounts are saved in the browser that registered them.') + '</p>' +
+          : 'New online registration needs the shared student register. Existing device-only accounts can only sign in on the device where they were created.') + '</p>' +
         (auth.error ? '<p class="field-error mt-2">' + esc(auth.error) + '</p>' : '') +
         '<button type="submit" class="btn btn--emerald btn--block btn--lg mt-3">' + svgIcon('log-in', 'ico--sm') + ' Log in</button>' +
         '<p class="hint mt-3">No account yet? Choose <b>Register</b> above — it takes one step.</p>' +
@@ -5520,6 +5611,25 @@ function renderStudentAuth() {
     } else {
       if (!state.settings.openRegistration) {
         body += '<div class="notice notice--warn mt-4"><b>Registration is closed.</b> Ask your teacher to add you from the admin page.</div>';
+      } else if (!syncActive()) {
+        var checkingRegistration = !state.sync.loaded && !auth.registrationCheckFailed && !!repoParts();
+        body += '<div class="notice ' + (checkingRegistration ? 'notice--info' : 'notice--warn') + ' mt-4"><div><b>' +
+          (checkingRegistration ? 'Checking online registration…' : 'Online registration is not ready.') + '</b> ' +
+          (checkingRegistration
+            ? 'The site is checking its shared student register. Please wait a moment.'
+            : (auth.registrationCheckFailed
+              ? 'The shared student register could not be checked. Check your connection or ask your teacher to verify the site setup. No account was created.'
+              : 'Ask your teacher to connect the shared student register. No account will be created until it is connected.')) +
+          '</div></div>' +
+          (auth.error ? '<p class="field-error mt-2">' + esc(auth.error) + '</p>' : '');
+        if (checkingRegistration) {
+          loadSyncConfig().then(function () {
+            if (auth.tab === 'register' && !auth.result && $('.modal[data-modal="student-auth"]')) {
+              if (!state.sync.loaded && !syncReady()) auth.registrationCheckFailed = true;
+              renderStudentAuth();
+            }
+          });
+        }
       } else {
         body += '<form class="mt-4" id="student-register-form" novalidate>' +
           '<div class="field"><label for="sr-name">First name <span class="req">*</span></label>' +
@@ -5530,11 +5640,9 @@ function renderStudentAuth() {
               years.map(function (y) { return '<option value="' + attr(y) + '">' + esc(y) + '</option>'; }).join('') +
             '</select></div>' +
           '<div class="notice notice--info">' +
-            '<div>The system will give you a <b>username</b> (your first name) and a <b>password</b> (your name + year level).</div>' +
+            '<div>The system creates a unique <b>username</b> and <b>password</b> and saves the account in the shared student register before showing your credentials.</div>' +
           '</div>' +
-          '<div class="notice notice--info mt-3"><div>' + (syncReady()
-            ? 'Your account is created in the <b>shared cloud</b>, so you can sign in from any device with these details.'
-            : 'Without the shared backend connected this account stays on this device. Ask your teacher if you need to use a different device.') + '</div></div>' +
+          '<div class="notice notice--info mt-3"><div>Your registration is saved online immediately. Your teacher can view the account in the admin dashboard; the public GitHub mirror never contains passwords.</div></div>' +
           (auth.error ? '<p class="field-error mt-2">' + esc(auth.error) + '</p>' : '') +
           '<button type="submit" class="btn btn--emerald btn--block btn--lg mt-3">' + svgIcon('user-plus', 'ico--sm') + ' Register and get my login</button>' +
         '</form>';
@@ -5546,7 +5654,7 @@ function renderStudentAuth() {
       name: 'student-auth', icon: 'graduation-cap', badge: 'emerald',
       title: auth.result ? 'Registration complete' : 'Student access',
       subtitle: auth.result
-        ? (auth.result.shared ? 'Your account is saved in the shared cloud — sign in from any device.' : 'Your account is saved on this device and will sync to the shared cloud.')
+        ? 'Your account is saved in the shared register — sign in from any device.'
         : 'Register with your first name and year level, or log in with the details you were given.',
       size: 'sm', body: body, actions: []
     });
@@ -5587,15 +5695,12 @@ function submitStudentRegister(event) {
     recordStudentVisit(student);
     state.authModal.result = {
       username: student.username, password: student.password, year: student.year,
-      shared: !!result.shared, offline: !!result.offline
+      shared: true, offline: false
     };
     state.authModal.error = '';
     renderAll();
     renderStudentAuth();
-    toast(result.shared
-      ? 'Registered on the shared cloud — you can now sign in from any device.'
-      : 'Registered. Your username is ' + student.username + ' and your password is ' + student.password + '.', 'success');
-    if (result.offline) toast('Saved on this device — it will be added to the shared cloud when the connection returns.', 'info');
+    toast('Registered on the shared student register — you can now sign in from any device.', 'success');
   }, function (err) {
     state.authModal.error = err.message;
     renderStudentAuth();
@@ -5659,8 +5764,8 @@ function renderAdminAuth() {
       loginAdmin($('#aa-user').value, $('#aa-pass').value);
       closeModal();
       renderAll();
-      toast('Signed in as administrator. Student monitoring is ready.', 'success');
-      showView('dashboard');
+      toast('Signed in as administrator. Refreshing the live student register…', 'success');
+      openAdminDashboard(true);
     } catch (err) {
       state.adminAuthError = err.message;
       renderAdminAuth();
@@ -5774,7 +5879,7 @@ function openHelp() {
         '<li>Monitor registrations, visits and downloads in the dashboard.</li>' +
         '<li>Export CSVs for records, or back up everything as JSON.</li></ol></div>' +
     '</div>' +
-    '<div class="notice notice--warn mt-4"><div><b>Sharing and privacy:</b> this is a static site. Student accounts and activity are browser-local unless a token-holding browser writes them to GitHub. This repository is public, so cloud-synced names, passwords and logs are readable by anyone. For safe shared registration and analytics, use a server-side backend; never publish the GitHub token.</div></div>',
+    '<div class="notice notice--warn mt-4"><div><b>Sharing and privacy:</b> this is a static site, so online student registration needs the shared Supabase backend configured by the teacher. A registration is only confirmed after the shared register accepts it; accounts are then visible in the admin dashboard. GitHub Pages cannot safely accept student writes directly without exposing a repository write token. The optional public GitHub mirror contains names and usernames, never passwords; keep the GitHub token in the administrator’s browser only.</div></div>',
     actions: [{ label: 'Close', action: 'modal-close', variant: 'btn--outline' }]
   });
 }
@@ -5788,12 +5893,12 @@ var ACTIONS = {
     if (!currentStudent()) { closeModal(); return openStudentAuth('login'); }
     closeModal(); showView('my-learning'); renderMyLearning();
   },
-  'open-dashboard': function () { if (!currentAdmin()) return openAdminAuth(); showView('dashboard'); renderDashboard(); },
+  'open-dashboard': function () { openAdminDashboard(true); },
   'open-student-auth': function () { openStudentAuth('login'); },
   'open-admin-auth': function () { openAdminAuth(); },
   'open-help': function () { openHelp(); },
   'logout': function () { closeModal(); logout(); },
-  'auth-tab': function (el) { state.authModal.tab = el.dataset.tab; state.authModal.error = ''; renderStudentAuth(); },
+  'auth-tab': function (el) { state.authModal.tab = el.dataset.tab; state.authModal.error = ''; state.authModal.registrationCheckFailed = false; renderStudentAuth(); },
   'copy-credentials': function () { copyCredentials(); },
   'focus-search': function () {
     showView('library');
@@ -6038,7 +6143,7 @@ var ACTIONS = {
   'save-sync': function () { saveSyncConfig(); },
   'test-sync': function () { testSyncConnection(); },
   'sync-now': function () { syncNow(false); },
-  'sync-cloud': function () { cloudSyncNow(false); },
+  'sync-cloud': function () { refreshAdminData(false); },
   'push-cloud': function () {
     if (syncActive() && currentAdmin()) {
       toast('Pulling the shared register first…', 'info');
@@ -6203,8 +6308,15 @@ function wireEvents() {
     abacusFlushQueue().then(function () { return loadAbacusTotals(true); })
       .then(function () { return syncAbacusFileTotals(true); });
     if (syncReady()) syncQueueFlush();
+    if (state.view === 'dashboard' && currentAdmin()) refreshAdminRosterIfStale(true);
   });
   window.addEventListener('offline', updateConnectionState);
+  window.addEventListener('focus', function () {
+    if (state.view === 'dashboard' && currentAdmin()) refreshAdminRosterIfStale(false);
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && state.view === 'dashboard' && currentAdmin()) refreshAdminRosterIfStale(false);
+  });
   window.addEventListener('beforeunload', function () { saveSession(); });
 }
 function updateConnectionState() {
@@ -6224,9 +6336,17 @@ function fillStaticOptions() {
   var owner = $('#up-owner');
   if (owner && !owner.value) owner.value = state.settings.defaultOwner || '';
 }
+function refreshAdminRosterIfStale(force) {
+  if (state.view !== 'dashboard' || !currentAdmin()) return Promise.resolve(null);
+  var last = state.sync.rosterAt ? new Date(state.sync.rosterAt).getTime() : 0;
+  if (!force && last && Date.now() - last < 30000) return Promise.resolve(null);
+  return loadSyncConfig().then(function () { return syncPullRoster(); });
+}
 function refreshRelativeTimes() {
-  if (state.view === 'dashboard') { renderStudentTable(); renderFeeds(); renderAnalytics(); renderFilesTable(); }
-  else if (state.view === 'my-learning') renderMyLearning();
+  if (state.view === 'dashboard') {
+    renderStudentTable(); renderFeeds(); renderAnalytics(); renderFilesTable();
+    refreshAdminRosterIfStale(false);
+  } else if (state.view === 'my-learning') renderMyLearning();
   renderCounters();
   if (navigator.onLine !== false) {
     loadAbacusTotals(false);

@@ -4,6 +4,12 @@
 import { JSDOM } from 'jsdom';
 import { createBackend } from './fake-supabase.mjs';
 import { readFileSync } from 'node:fs';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const backend = await createBackend();
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -171,11 +177,28 @@ other.window.state.resources = [remoteItem];
 await other.window.syncAbacusFileTotals(true);
 check('another browser fetches the same per-file total', remoteItem.downloads === 2, remoteItem.downloads);
 
-console.log('\n6. admin pulls the shared register');
+console.log('\n6. admin pulls the shared register live');
 app.loginAdmin('peter82', 'petgabs82');
 const added = await app.syncPullRoster();
 check('roster pulled into the dashboard', typeof added === 'number' && app.state.students.length >= 2, { added, total: app.state.students.length });
 check('students carry usernames from the backend', app.state.students.some((s) => s.username === 'ada2'));
+const liveAdmin = await secondBrowser();
+liveAdmin.window.loginAdmin('peter82', 'petgabs82');
+const openedDashboard = await liveAdmin.window.openAdminDashboard(true);
+check('opening the admin dashboard pulls registrations from the live backend', openedDashboard && liveAdmin.window.state.students.length >= 2, { refreshed: openedDashboard, total: liveAdmin.window.state.students.length });
+const liveRegistration = await guard(() => app.registerStudent('Grace', 'Year 10'));
+await liveAdmin.window.refreshAdminData(true);
+check('a registration from another browser appears after the dashboard refresh', liveAdmin.window.state.students.some((s) => s.username === liveRegistration.student.username && s.year === 'Year 10'), liveAdmin.window.state.students.map((s) => s.username));
+check('a live roster refresh updates a changed status and removes deleted shared rows', await (async () => {
+  const row = liveAdmin.window.state.students.find((s) => s.username === 'ada');
+  await app.syncAdminStudent('upsert', Object.assign({}, row, { status: 'blocked' }));
+  await app.syncAdminStudent('delete', liveRegistration.student);
+  await liveAdmin.window.refreshAdminData(true);
+  app.state.students = app.state.students.filter((s) => s.id !== liveRegistration.student.id);
+  app.saveStudents();
+  return liveAdmin.window.state.students.find((s) => s.username === 'ada').status === 'blocked' &&
+    !liveAdmin.window.state.students.some((s) => s.username === liveRegistration.student.username);
+})());
 
 console.log('\n7. the repository mirror never receives passwords');
 const payloadText = JSON.stringify(app.cloudDataPayload());
@@ -189,17 +212,20 @@ await app.pushCloudData(true);
 check('snapshot committed to the repository', githubState.cloudData && githubState.cloudData.students.length >= 2, githubState.cloudData && githubState.cloudData.students && githubState.cloudData.students.length);
 check('committed snapshot has no passwords', !JSON.stringify(githubState.cloudData).includes('"password"'));
 
-console.log('\n8. offline behaviour');
+console.log('\n8. online registration fails closed while offline, then retries safely');
 const offline = await secondBrowser({ offline: true });
-const queued = await guard(() => offline.window.registerStudent('Offline', 'Year 11'));
-check('registers locally when offline', queued.shared === false && queued.offline === true, queued);
-check('registration is queued for later', offline.window.syncQueue().length === 1, offline.window.syncQueue().length);
+const offlineRegistration = await guard(() => offline.window.registerStudent('Offline', 'Year 11'))
+  .then(() => null, (err) => err);
+check('does not report an offline registration as complete', !!offlineRegistration && /No credentials were issued/.test(offlineRegistration.message), offlineRegistration && offlineRegistration.message);
+check('does not create the offline student locally or queue a registration', !offline.window.state.students.some((s) => s.username === 'offline') && offline.window.syncQueue().length === 0, { usernames: offline.window.state.students.map((s) => s.username), queued: offline.window.syncQueue().length });
 check('Abacus visit is queued while the browser is offline', offline.window.abacusQueue().some((entry) => entry.key === 'visits'), offline.window.abacusQueue());
-check('local login still works offline', (await guard(() => offline.window.loginStudent('offline', 'offline11'))).username === 'offline');
 const visitsBeforeFlush = abacusState.get('petgabs-github-io-madv/visits') || 0;
 offline.window.__setOffline(false);
 await offline.window.abacusFlushQueue();
 check('offline Abacus hit flushes once on reconnect', abacusState.get('petgabs-github-io-madv/visits') === visitsBeforeFlush + 1, abacusState.get('petgabs-github-io-madv/visits'));
+const retriedRegistration = await guard(() => offline.window.registerStudent('Offline', 'Year 11'));
+check('retry after reconnect creates a shared account', retriedRegistration.shared === true && retriedRegistration.student.username === 'offline', retriedRegistration);
+check('retry reuses the same idempotency key and leaves no queued registration', offline.window.syncQueue().length === 0 && !!retriedRegistration.student.syncedAt, offline.window.syncQueue().length);
 offline.window.abacusQueueSave([
   { key: 'visits', kind: 'visits' },
   { key: 'downloads', kind: 'downloads' }
@@ -210,6 +236,7 @@ check('an uncertain failed hit is not retried and later queued hits are preserve
   offline.window.abacusQueue().length === 1 && offline.window.abacusQueue()[0].key === 'downloads', offline.window.abacusQueue());
 
 console.log('\n9. saving the configuration writes only public values');
+app.loginAdmin('peter82', 'petgabs82');
 app.state.settings.dataDir = 'data';
 const urlInput = window.document.querySelector('#sync-url');
 const keyInput = window.document.querySelector('#sync-key');
@@ -237,15 +264,38 @@ check('roster switch is saved', app.state.settings.syncRosterInRepo === false);
 app.state.settings.syncRosterInRepo = true;
 app.saveOptions();
 
-console.log('\n11. a site with no backend still works (device-only mode)');
+console.log('\n11. a site with no backend does not issue a local-only registration');
 const plain = await secondBrowser({ noConfig: true });
-const localReg = await guard(() => plain.window.registerStudent('Grace', 'Year 11'));
-check('registers on the device', localReg.shared === false && localReg.student.username === 'grace', localReg.student && localReg.student.username);
-check('nothing was queued without a backend', plain.window.syncQueue().length === 0);
-check('local sign-in works', (await guard(() => plain.window.loginStudent('grace', 'grace11'))).username === 'grace');
+const localRegistration = await guard(() => plain.window.registerStudent('Grace', 'Year 11')).then(() => null, (err) => err);
+check('registration fails with a setup message', !!localRegistration && /not configured/.test(localRegistration.message), localRegistration && localRegistration.message);
+check('no account, credentials, or queued registration is created', plain.window.state.students.length === 0 && plain.window.syncQueue().length === 0, { students: plain.window.state.students.length, queued: plain.window.syncQueue().length });
+plain.window.openStudentAuth('register');
+check('student registration UI explains the shared backend requirement', /Online registration is not ready/.test(plain.window.document.querySelector('#modal-body').textContent), plain.window.document.querySelector('#modal-body').textContent);
+check('student registration form is not shown without the backend', !plain.window.document.querySelector('#student-register-form'));
 check('sync status is not configured', plain.window.syncReady() === false);
 plain.window.renderSettings();
 check('status tag reads Not configured', plain.window.document.querySelector('#sync-status').textContent === 'Not configured', plain.window.document.querySelector('#sync-status').textContent);
+
+console.log('\n12. the GitHub mirror exporter copies the shared roster without passwords');
+const tempDir = await mkdtemp(join(tmpdir(), 'madv-cloud-export-'));
+const exportPath = join(tempDir, 'cloud-data.json');
+const repoRoot = fileURLToPath(new URL('../', import.meta.url));
+const run = promisify(execFile);
+const exporterResult = await run(process.execPath, [join(repoRoot, 'scripts/export-cloud-data.mjs'), '--out', exportPath], {
+  cwd: repoRoot,
+  env: Object.assign({}, process.env, {
+    SUPABASE_URL: backend.url,
+    SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test',
+    ADMIN_USER: 'peter82',
+    ADMIN_PASS: 'petgabs82',
+    SITE_TIMEZONE: 'UTC'
+  })
+});
+const exportedSnapshot = JSON.parse(await readFile(exportPath, 'utf8'));
+check('exporter wrote the repository snapshot', /wrote .*cloud-data\.json/.test(exporterResult.stdout), exporterResult.stdout);
+check('exported snapshot includes the current shared roster', exportedSnapshot.source === 'shared-backend' && exportedSnapshot.students.length >= 3, exportedSnapshot.students.length);
+check('exported snapshot contains no password values', !/"password"\s*:/.test(JSON.stringify(exportedSnapshot)) && !JSON.stringify(exportedSnapshot).includes('ada12'));
+await rm(tempDir, { recursive: true, force: true });
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 await backend.close();

@@ -1,5 +1,5 @@
 {
-  "_comment": "Optional cloud snapshot. This file is public in a public repository and can contain student names, usernames, plaintext passwords and activity logs. Do not sync sensitive student data here.",
+  "_comment": "Password-free cloud snapshot. This file is public in a public repository and may contain student names, usernames and activity counts; passwords must never be written here.",
   "subject": "Mathematics Advanced",
   "updatedAt": "2026-10-03T13:07:24.341Z",
   "counters": {

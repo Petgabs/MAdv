@@ -438,7 +438,7 @@ declare
   v_password text;
   v_name     text;
   v_row      public.madv_students;
-  v_n        integer := 2;
+  v_n        integer := 1;
 begin
   v_name := btrim(regexp_replace(coalesce(p_first_name, ''), '\s+', ' ', 'g'));
 
@@ -457,7 +457,8 @@ begin
     return jsonb_build_object('ok', false, 'error', 'A valid client id is required.');
   end if;
 
-  -- Registering twice on the same device returns the existing account.
+  -- A retry with the same client id is idempotent, including a retry after
+  -- the server committed but the browser did not receive the response.
   select * into v_row from public.madv_students where client_id = p_client_id;
   if found then
     return public.madv_student_json(v_row) || jsonb_build_object('ok', true, 'alreadyRegistered', true);
@@ -466,23 +467,41 @@ begin
   v_base := lower(regexp_replace(v_name, '[^a-zA-Z0-9]', '', 'g'));
   if v_base = '' then v_base := 'student'; end if;
   v_base := left(v_base, 24);
-  v_username := v_base;
 
-  while exists (select 1 from public.madv_students where lower(username) = lower(v_username)) loop
-    v_username := v_base || v_n::text;
-    v_n := v_n + 1;
-    if v_n > 500 then
-      return jsonb_build_object('ok', false, 'error', 'Too many students share this name. Ask your teacher to add you.');
-    end if;
+  -- A pre-check gives the common path a deterministic, readable username.
+  -- The unique index remains the final arbiter; if two registrations race for
+  -- the same suffix, retry with the next one rather than failing registration.
+  loop
+    v_username := case when v_n = 1 then v_base else v_base || v_n::text end;
+    while exists (select 1 from public.madv_students where lower(username) = lower(v_username)) loop
+      v_n := v_n + 1;
+      if v_n > 500 then
+        return jsonb_build_object('ok', false, 'error', 'Too many students share this name. Ask your teacher to add you.');
+      end if;
+      v_username := v_base || v_n::text;
+    end loop;
+
+    v_password := lower(v_username || public.madv_year_digits(p_year));
+    begin
+      insert into public.madv_students (client_id, first_name, username, password, year,
+          status, registered_at, last_visit, visit_count, download_count)
+      values (p_client_id, public.madv_titlecase(v_name), v_username, v_password, p_year,
+          'active', now(), now(), 0, 0)
+      returning * into v_row;
+      exit;
+    exception when unique_violation then
+      -- A duplicate client id is a lost-response retry; a duplicate username
+      -- means a concurrent student registered the same name first.
+      select * into v_row from public.madv_students where client_id = p_client_id;
+      if found then
+        return public.madv_student_json(v_row) || jsonb_build_object('ok', true, 'alreadyRegistered', true);
+      end if;
+      v_n := v_n + 1;
+      if v_n > 500 then
+        return jsonb_build_object('ok', false, 'error', 'Too many students share this name. Ask your teacher to add you.');
+      end if;
+    end;
   end loop;
-
-  v_password := lower(v_username || public.madv_year_digits(p_year));
-
-  insert into public.madv_students (client_id, first_name, username, password, year,
-      status, registered_at, last_visit, visit_count, download_count)
-  values (p_client_id, public.madv_titlecase(v_name), v_username, v_password, p_year,
-      'active', now(), now(), 0, 0)
-  returning * into v_row;
 
   insert into public.madv_logins (student_id, name, year, ok, kind)
   values (v_row.client_id, v_row.first_name, v_row.year, true, 'Registration');
