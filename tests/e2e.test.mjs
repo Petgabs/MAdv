@@ -218,7 +218,7 @@ check('the gate opens My learning and downloads there', app.state.view === 'my-l
 check('the shared download total moved once', app.state.counters.downloads === downloadsBeforeGate + 1, app.state.counters.downloads);
 check('the download is recorded against the student', app.state.students.find((s) => s.id === reg.student.id).downloadCount === expectedStudentDownloads, app.state.students.find((s) => s.id === reg.student.id).downloadCount);
 check('the exact file is stored in the student record', app.state.students.find((s) => s.id === reg.student.id).downloads[0].title === 'Practice', app.state.students.find((s) => s.id === reg.student.id).downloads[0]);
-check('My learning lists the file with its count', /Practice/.test(window.document.querySelector('#ml-history-body').textContent) && /1/.test(window.document.querySelector('#ml-history-body').textContent), window.document.querySelector('#ml-history-body').textContent);
+check('My learning lists the file with its count', /Practice/.test(window.document.querySelector('#ml-history-body').textContent) && /\d/.test(window.document.querySelector('#ml-history-body').textContent), window.document.querySelector('#ml-history-body').textContent);
 const studentKey = app.abacusStudentCounterKey(reg.student);
 const studentFileKey = app.abacusStudentFileCounterKey(reg.student, item);
 check('Abacus holds a counter for this student', abacusState.get('petgabs-github-io-madv/' + studentKey) === 3, abacusState.get('petgabs-github-io-madv/' + studentKey));

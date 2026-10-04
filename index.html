@@ -629,6 +629,37 @@ table.data th.num{text-align:right}
   *{animation-duration:.001ms !important;transition-duration:.001ms !important}
   html{scroll-behavior:auto}
 }
+
+/* ---------- 18. Messaging — teacher-student support ---------- */
+.msg-panel{position:relative}
+.msg-composer{background:var(--slate-50);border:1px solid var(--slate-200);border-radius:var(--radius-lg);padding:1rem}
+.msg-list{display:flex;flex-direction:column;gap:.75rem;max-height:32rem;overflow:auto;padding-right:.25rem}
+.msg-item{background:#fff;border:1px solid var(--slate-200);border-radius:var(--radius-lg);padding:.9rem 1rem;position:relative;transition:border-color .15s,box-shadow .15s,background-color .15s}
+.msg-item--unread{border-color:var(--indigo-300);background:linear-gradient(0deg,var(--indigo-50),#fff);box-shadow:0 0 0 1px var(--indigo-100),var(--shadow-xs)}
+.msg-item--unread::before{content:"";position:absolute;left:0;top:.9rem;bottom:.9rem;width:3px;background:var(--indigo-600);border-radius:999px}
+.msg-item__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
+.msg-item__from{display:flex;align-items:center;gap:.6rem;font-weight:800;color:var(--slate-900)}
+.msg-item__from .avatar{width:1.9rem;height:1.9rem;font-size:.72rem}
+.msg-item__meta{font-size:.72rem;color:var(--slate-500);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.msg-item__body{margin-top:.6rem;font-size:.88rem;line-height:1.65;color:var(--slate-700);white-space:pre-wrap;word-wrap:break-word}
+.msg-item__actions{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.75rem}
+.msg-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.68rem;font-weight:800;letter-spacing:.04em;border-radius:999px;padding:.18rem .5rem;border:1px solid transparent}
+.msg-badge--unread{background:var(--indigo-600);color:#fff;border-color:var(--indigo-600);box-shadow:0 1px 2px rgb(99 102 241 / .25)}
+.msg-badge--read{background:var(--slate-100);color:var(--slate-600);border-color:var(--slate-200)}
+.msg-badge--admin{background:var(--indigo-50);color:var(--indigo-700);border-color:var(--indigo-200)}
+.msg-badge--student{background:var(--emerald-50);color:var(--emerald-700);border-color:var(--emerald-200)}
+.msg-badge--broadcast{background:var(--amber-50);color:var(--amber-700);border-color:var(--amber-200)}
+.msg-empty{display:grid;place-items:center;padding:2rem 1rem;text-align:center;color:var(--slate-500);background:var(--slate-50);border:1px dashed var(--slate-200);border-radius:var(--radius-lg)}
+.msg-empty .ico{color:var(--slate-400);margin-bottom:.6rem}
+.msg-count{font-variant-numeric:tabular-nums}
+.msg-notice{position:relative;overflow:hidden}
+.msg-notice::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--indigo-500)}
+.admin-name-card{display:flex;align-items:center;gap:.75rem;background:linear-gradient(135deg,var(--indigo-50),#fff);border:1px solid var(--indigo-100);border-radius:var(--radius-lg);padding:.85rem 1rem}
+.admin-name-card .avatar{width:2.2rem;height:2.2rem;background:var(--indigo-600);color:#fff}
+.header-msg-btn{position:relative}
+.header-msg-btn .badge-count{position:absolute;top:-6px;right:-6px;min-width:1.15rem;height:1.15rem;display:grid;place-items:center;padding:0 .25rem;font-size:.62rem;line-height:1;border:2px solid #fff}
+@media (max-width:640px){.header-msg-btn .badge-count{top:-4px;right:-4px}}
+
 </style>
 </head>
 <body data-view="library">
@@ -718,6 +749,11 @@ table.data th.num{text-align:right}
     <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></symbol>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></symbol>
     <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 8.5 8.5 3 21 15.5 15.5 21z"/><path d="m7 7 2 2"/><path d="m10 4 2 2"/><path d="m4 10 2 2"/><path d="m13 13 2 2"/><path d="m16 16 2 2"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></symbol>
+    <symbol id="i-message-square" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-1.9.5 4.48 4.48 0 0 0 1.1-5.4 8.94 8.94 0 0 1-2.8 1.1A4.48 4.48 0 0 0 12 3.5a4.48 4.48 0 0 0-4.5 4.5c0 .35.03.7.1 1A12.94 12.94 0 0 1 2 5.8a4.48 4.48 0 0 0 1.4 6 4.3 4.3 0 0 1-2-.55v.05A4.48 4.48 0 0 0 5 15.2a4.48 4.48 0 0 1-2 .07 4.48 4.48 0 0 0 4.2 3.1A9 9 0 0 1 2 20a12.94 12.94 0 0 0 7 2 12.93 12.93 0 0 0 13-13c0-.2 0-.4 0-.6A9.2 9.2 0 0 0 24 4.6a9 9 0 0 1-2.6.7z"/></symbol>
+    <symbol id="i-reply" viewBox="0 0 24 24"><path d="M9 10 4 15l5 5"/><path d="M4 15h10a4 4 0 0 1 4 4v3"/></symbol>
     <symbol id="i-percent" viewBox="0 0 24 24"><path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></symbol>
   </defs>
 </svg>
@@ -782,6 +818,15 @@ table.data th.num{text-align:right}
       </button>
       <button type="button" class="btn btn--outline btn--sm admin-only" data-action="open-admin-auth" id="admin-login-btn">
         <svg class="ico ico--sm" aria-hidden="true"><use href="#i-shield"/></svg> Admin
+      </button>
+      <!-- Messaging — teacher-student support -->
+      <button type="button" class="btn btn--outline btn--sm header-msg-btn admin-only" id="header-msg-admin" data-action="scroll-to-admin-messages" hidden aria-label="Open teacher messages">
+        <svg class="ico ico--sm" aria-hidden="true"><use href="#i-mail"/></svg> <span>Messages</span>
+        <span class="badge-count" id="header-msg-badge-admin" hidden>0</span>
+      </button>
+      <button type="button" class="btn btn--outline btn--sm header-msg-btn student-only" id="header-msg-student" data-action="scroll-to-student-messages" hidden aria-label="Open my messages">
+        <svg class="ico ico--sm" aria-hidden="true"><use href="#i-mail"/></svg> <span>Messages</span>
+        <span class="badge-count" id="header-msg-badge-student" hidden>0</span>
       </button>
       <button type="button" class="btn btn--outline btn--sm" data-action="logout" id="logout-btn" hidden>
         <svg class="ico ico--sm" aria-hidden="true"><use href="#i-log-out"/></svg> Sign Out
@@ -1097,6 +1142,64 @@ table.data th.num{text-align:right}
 
       <div class="notice notice--ok mb-6" id="ml-download-note" role="status"></div>
 
+      <!-- New message notice (student) -->
+      <div class="notice notice--info mb-6 msg-notice" id="student-new-msg-notice" hidden role="status">
+        <svg class="ico ico--sm" aria-hidden="true"><use href="#i-mail"/></svg>
+        <div class="grow">
+          <b><span id="student-new-msg-count">0</span> new message(s)</b> from your teacher — scroll down to Messages to read them.
+        </div>
+        <button type="button" class="btn btn--primary btn--sm" data-action="scroll-to-student-messages">
+          <svg class="ico ico--sm" aria-hidden="true"><use href="#i-message-square"/></svg> Open messages
+        </button>
+      </div>
+
+      <!-- Student messaging -->
+      <section class="panel mb-6" id="student-messages-panel" aria-labelledby="student-messages-heading">
+        <div class="panel__head">
+          <div>
+            <h3 id="student-messages-heading">Messages from your teacher <span class="badge-count" id="student-msg-badge" hidden></span></h3>
+            <p>Get help, ask questions and stay on track. Your teacher replies here. Be respectful and keep it about learning.</p>
+          </div>
+          <div class="toolbar-inline">
+            <span class="live-chip" id="student-msg-teacher-chip" hidden><span class="dot"></span> <span id="student-msg-teacher-name">Teacher</span></span>
+            <button type="button" class="btn btn--subtle btn--sm" data-action="refresh-messages">
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-refresh"/></svg> Refresh
+            </button>
+          </div>
+        </div>
+        <div class="panel__body">
+          <div class="notice notice--info mb-4">
+            <svg class="ico ico--sm" aria-hidden="true"><use href="#i-shield-check"/></svg>
+            <div><b>How messaging helps your learning:</b> Stuck on a topic? Share the question number and what you tried. Your teacher can point you to the right example or worksheet. Celebrate wins too — tell them what went well.</div>
+          </div>
+          <div class="msg-composer">
+            <div class="field">
+              <label for="student-msg-body">Write to your teacher</label>
+              <textarea class="textarea" id="student-msg-body" maxlength="2000" rows="3" placeholder="Hi, I’m stuck on… I tried… Can you help with…?"></textarea>
+              <p class="hint"><span class="msg-count" id="student-msg-count">0</span>/2000 · Your message goes directly to your teacher. Keep it kind and specific.</p>
+            </div>
+            <div class="row row--wrap">
+              <button type="button" class="btn btn--primary" data-action="student-send-message">
+                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-send"/></svg> Send to teacher
+              </button>
+              <span class="hint" id="student-msg-status"></span>
+            </div>
+          </div>
+          <div class="msg-list mt-4" id="student-msg-list" role="list"></div>
+          <div class="msg-empty mt-3" id="student-msg-empty" hidden>
+            <svg class="ico ico--xl" aria-hidden="true"><use href="#i-message-square"/></svg>
+            <h4 class="block-title text-sm" style="margin-top:.35rem">No messages yet</h4>
+            <p class="text-sm muted mt-1">Your teacher’s guidance and replies will appear here. Check back after class.</p>
+          </div>
+          <div class="row row--wrap mt-3">
+            <button type="button" class="btn btn--ghost btn--sm" data-action="mark-all-student-read">
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-check-circle"/></svg> Mark all as read
+            </button>
+            <span class="hint">Messages sync when the shared backend is connected. Be patient — teachers reply when they can.</span>
+          </div>
+        </div>
+      </section>
+
       <div class="split">
         <section class="panel" aria-labelledby="ml-for-you">
           <div class="panel__head">
@@ -1184,6 +1287,109 @@ table.data th.num{text-align:right}
         <svg class="ico ico--sm" aria-hidden="true"><use href="#i-database"/></svg>
         <span id="backend-status-text">Checking counters…</span>
       </div>
+      <!-- New message notice (admin) -->
+      <div class="notice notice--info mb-6 msg-notice" id="admin-new-msg-notice" hidden role="status">
+        <svg class="ico ico--sm" aria-hidden="true"><use href="#i-mail"/></svg>
+        <div class="grow">
+          <b><span id="admin-new-msg-count">0</span> new message(s)</b> from students — open the messaging centre to read and reply. Quick, supportive replies keep students engaged.
+        </div>
+        <button type="button" class="btn btn--primary btn--sm" data-action="scroll-to-admin-messages">
+          <svg class="ico ico--sm" aria-hidden="true"><use href="#i-message-square"/></svg> Open messages
+        </button>
+      </div>
+
+      <!-- Teacher profile & messaging centre (admin) -->
+      <section class="panel mb-6" id="admin-messages-panel" aria-labelledby="admin-messages-heading">
+        <div class="panel__head">
+          <div>
+            <h3 id="admin-messages-heading">Teacher–Student Messages</h3>
+            <p>Support your class with clear, encouraging messages. Broadcast to all students or write to one learner. Students reply here and you are notified instantly.</p>
+          </div>
+          <div class="toolbar-inline">
+            <span class="tag tag--indigo" id="admin-msg-unread-tag" hidden>
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-mail"/></svg> <span id="admin-msg-unread-text">0 new</span>
+            </span>
+            <button type="button" class="btn btn--subtle btn--sm" data-action="refresh-messages">
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-refresh"/></svg> Refresh
+            </button>
+          </div>
+        </div>
+        <div class="panel__body">
+          <!-- Teacher identity -->
+          <div class="admin-name-card mb-4">
+            <span class="avatar" id="admin-profile-avatar">T</span>
+            <div class="grow">
+              <p class="text-sm" style="font-weight:800" id="admin-profile-name">Teacher</p>
+              <p class="hint" id="admin-profile-sub">This name appears on every message you send. Students see it as “From: Teacher”.</p>
+            </div>
+            <div class="row row--wrap" style="min-width:18rem;flex:1">
+              <div class="field" style="flex:1 1 14rem;margin-bottom:0">
+                <label for="admin-name-input" class="sr-only">Teacher display name</label>
+                <input class="input" id="admin-name-input" type="text" maxlength="60" placeholder="e.g. Mr Peter — Mathematics">
+              </div>
+              <button type="button" class="btn btn--dark btn--sm" data-action="save-admin-name">
+                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-save"/></svg> Save name
+              </button>
+            </div>
+          </div>
+
+          <!-- Composer -->
+          <div class="msg-composer">
+            <div class="row row--between row--wrap mb-2">
+              <h4 class="block-title text-sm">Compose a message</h4>
+              <span class="hint">Tip: Be specific, encouraging and kind. Acknowledge effort, name the next step.</span>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="admin-msg-recipient">Send to</label>
+                <select class="select" id="admin-msg-recipient">
+                  <option value="broadcast">All students (broadcast)</option>
+                </select>
+              </div>
+              <div class="field" id="admin-msg-student-field" hidden>
+                <label for="admin-msg-student">Choose student</label>
+                <select class="select" id="admin-msg-student"></select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="admin-msg-body">Message</label>
+              <textarea class="textarea" id="admin-msg-body" maxlength="2000" rows="3" placeholder="Well done on today’s practice — try the next revision set and message me if you get stuck on Q3…"></textarea>
+              <p class="hint"><span class="msg-count" id="admin-msg-count">0</span>/2000 characters · Your tone sets the culture. Keep it supportive.</p>
+            </div>
+            <div class="row row--wrap">
+              <button type="button" class="btn btn--primary" data-action="admin-send-message">
+                <svg class="ico ico--sm" aria-hidden="true"><use href="#i-send"/></svg> Send message
+              </button>
+              <span class="hint" id="admin-msg-status"></span>
+            </div>
+          </div>
+
+          <!-- Tabs -->
+          <div class="tabs mt-4" role="tablist" aria-label="Teacher message tabs">
+            <button type="button" role="tab" aria-selected="true" data-action="switch-admin-msg-tab" data-tab="inbox">
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-inbox"/></svg> Inbox <span class="badge-count" id="admin-inbox-badge" hidden></span>
+            </button>
+            <button type="button" role="tab" aria-selected="false" data-action="switch-admin-msg-tab" data-tab="sent">
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-send"/></svg> Sent
+            </button>
+            <button type="button" role="tab" aria-selected="false" data-action="switch-admin-msg-tab" data-tab="all">
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-layers"/></svg> All
+            </button>
+          </div>
+          <div class="msg-list mt-3" id="admin-msg-list" role="list"></div>
+          <div class="msg-empty mt-3" id="admin-msg-empty" hidden>
+            <svg class="ico ico--xl" aria-hidden="true"><use href="#i-message-square"/></svg>
+            <h4 class="block-title text-sm" style="margin-top:.35rem">No messages yet</h4>
+            <p class="text-sm muted mt-1">Inbox will show student questions. Sent shows what you’ve broadcast. Start with a warm welcome to the class.</p>
+          </div>
+          <div class="row row--wrap mt-3">
+            <button type="button" class="btn btn--ghost btn--sm" data-action="mark-all-admin-read">
+              <svg class="ico ico--sm" aria-hidden="true"><use href="#i-check-circle"/></svg> Mark all as read
+            </button>
+            <span class="hint" id="admin-msg-footnote">Messages sync via the shared backend when online. Students must be registered to reply.</span>
+          </div>
+        </div>
+      </section>
 
       <!-- Quick actions -->
       <section class="panel panel--pad mb-6" aria-labelledby="quick-actions-heading">
@@ -1891,6 +2097,11 @@ table.data th.num{text-align:right}
           <div class="panel__body">
             <div class="field-row">
               <div class="field">
+                <label for="admin-display-input">Teacher display name (shown to students)</label>
+                <input class="input" id="admin-display-input" type="text" maxlength="60" placeholder="e.g. Mr Peter — Mathematics">
+                <p class="hint">Students see this name on every message from you. It is saved on this device.</p>
+              </div>
+              <div class="field">
                 <label for="admin-user-input">Admin username</label>
                 <input class="input" id="admin-user-input" type="text" autocomplete="off" placeholder="peter82">
               </div>
@@ -2103,7 +2314,8 @@ var KEYS = {
   registrationAttempt: 'madv.registration-attempt.v1',
   authLock: 'madv.auth-lock.v1',
   diagnostics: 'madv.diagnostics.v1',
-  downloadCache: 'madv.download-cache.v1'
+  downloadCache: 'madv.download-cache.v1',
+  messages: 'madv.messages.v1'
 };
 var DEFAULT_SETTINGS = {
   repo: '',
@@ -2128,6 +2340,7 @@ var DEFAULT_SETTINGS = {
   years: DEFAULT_YEARS.slice(),
   adminUser: DEFAULT_ADMIN.user,
   adminPass: DEFAULT_ADMIN.pass,
+  adminDisplayName: '',
   // Minutes of inactivity before the admin area signs itself out. 0 = never.
   adminIdleMinutes: ADMIN_IDLE_DEFAULT_MIN,
   version: APP_VERSION
@@ -2213,7 +2426,11 @@ var state = {
   adminAuthError: '',
   busy: false,
   renderPending: false, // a hidden tab skipped a redraw; catch up when it returns
-  transport: 'device'   // 'cloud' when the repository is reachable
+  transport: 'device',   // 'cloud' when the repository is reachable
+  messages: store.get(KEYS.messages, []),
+  messagesTabAdmin: 'inbox',
+  messagesLoadedAt: 0,
+  messagesLoading: false
 };
 // The download policy is fixed: a visitor must register/sign in as a student and
 // download from their own My learning page. An old saved setting cannot relax it.
@@ -2236,6 +2453,20 @@ function saveStudents() { store.set(KEYS.students, state.students); }
 function saveResources() { store.set(KEYS.resources, state.resources); }
 function saveLogs() { store.set(KEYS.logs, state.logs); }
 function saveCounters() { state.counters.updatedAt = new Date().toISOString(); store.set(KEYS.counters, state.counters); }
+function saveMessages() { store.set(KEYS.messages, state.messages || []); }
+function adminDisplayName() {
+  var name = String(state.settings.adminDisplayName || '').trim();
+  if (name) return name;
+  // fallback to owner or admin user
+  if (state.settings.defaultOwner) return String(state.settings.defaultOwner).trim();
+  return String(state.settings.adminUser || 'Teacher');
+}
+function saveAdminDisplayName(name) {
+  state.settings.adminDisplayName = String(name || '').trim().slice(0, 60);
+  saveSettings();
+  renderAll();
+  toast(state.settings.adminDisplayName ? 'Teacher name saved as "' + state.settings.adminDisplayName + '".' : 'Teacher name cleared — using your username.', 'success');
+}
 /* Sessions ---------------------------------------------------------------
    A student session is remembered on the device so a class does not have to
    sign in every lesson. An administrator session is deliberately tab-scoped:
@@ -3522,7 +3753,8 @@ function studentDownloadHistory(student) {
   if (!student) return [];
   var merged = [], seen = {};
   function keyOf(entry) {
-    return (entry.at || '') + '|' + (entry.resourceKey || entry.resourceId || entry.title || entry.fileName || '');
+    // Use resourceId first so a download recorded in both student.downloads and logs collapses to one entry
+    return (entry.at || '') + '|' + (entry.resourceId || entry.resourceKey || entry.title || entry.fileName || '');
   }
   function add(entry) {
     if (!entry || (!entry.at && !entry.title && !entry.fileName)) return;
@@ -4992,8 +5224,10 @@ function renderCounters() {
   if (pill) pill.title = abacusDetail + ' · ' + formatCount(state.counters.visitsToday || 0) + ' visits today';
   var dpill = $('#download-pill');
   if (dpill) dpill.title = abacusDetail + ' · ' + formatCount(state.counters.downloadsToday || 0) + ' downloads today';
+  try { updateMessageBadges(); } catch(e){}
 }
 function renderAll() {
+  try { updateMessageBadges(); } catch(e){}
   applyVisibility();
   renderCounters();
   renderLibrary();
@@ -5343,6 +5577,7 @@ function renderMyLearning() {
   }
   var empty = $('#ml-history-empty');
   if (empty) empty.hidden = history.length > 0;
+  try { renderStudentMessages(); } catch(e){ recordDiagnostic('render', errorText(e), 'renderStudentMessages'); }
 }
 // Reads the student's own Abacus counter once per visit, then redraws the page.
 function maybeLoadStudentAbacusTotal(student, knownValue) {
@@ -5422,6 +5657,7 @@ function renderDashboard() {
   renderFeeds();
   renderAnalytics();
   renderFilesTable();
+  try { renderAdminMessages(); } catch(e){ recordDiagnostic('render', errorText(e), 'renderAdminMessages'); }
 }
 function renderStudentTable() {
   var body = $('#students-body');
@@ -5727,6 +5963,11 @@ function renderSettings() {
   var idleInput = $('#opt-admin-idle');
   if (idleInput && !idleInput.dataset.touched) idleInput.value = adminIdleMinutes();
   renderDiagnostics();
+  var disp = $('#admin-display-input');
+  if (disp && document.activeElement!==disp) disp.value = state.settings.adminDisplayName || '';
+  var nameIn = $('#admin-name-input');
+  if (nameIn && document.activeElement!==nameIn) nameIn.value = state.settings.adminDisplayName || '';
+  try { updateMessageBadges(); } catch(e){}
   $('#data-students').textContent = formatCount(state.students.length);
   $('#data-files').textContent = formatCount(state.resources.length);
   $('#data-downloads').textContent = formatCount(state.counters.downloads || 0);
@@ -5812,6 +6053,419 @@ function setSwitch(sel, value) {
 }
 
 /* ------------------------------- 7c. Exports ------------------------------ */
+
+/* --------------------------- 7b. Messaging (teacher-student support) --------------------------- */
+var MSG_MAX_LEN = 2000;
+function sanitizeMsgBody(s) { return String(s||'').replace(/\r\n/g,'\n').trim().slice(0, MSG_MAX_LEN); }
+function msgId() { try { return 'msg_' + crypto.randomUUID().replace(/-/g,''); } catch(e){ return uid('msg'); } }
+function normalizeMessage(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  var id = raw.id || raw.clientId || msgId();
+  var createdAt = raw.createdAt || raw.created_at || new Date().toISOString();
+  return {
+    id: String(id),
+    createdAt: String(createdAt),
+    fromRole: raw.fromRole || raw.from_role || 'student',
+    fromId: String(raw.fromId || raw.from_id || ''),
+    fromName: String(raw.fromName || raw.from_name || (raw.fromRole==='admin'? adminDisplayName() : 'Student')).slice(0,60),
+    toRole: raw.toRole || raw.to_role || 'admin',
+    toId: raw.toId !== undefined ? (raw.toId===null? null : String(raw.toId)) : (raw.to_id !== undefined ? (raw.to_id===null? null : String(raw.to_id)) : null),
+    body: String(raw.body || '').slice(0, MSG_MAX_LEN),
+    isRead: !!raw.isRead || !!raw.is_read,
+    deletedForAdmin: !!raw.deletedForAdmin || !!raw.deleted_for_admin,
+    deletedForStudent: !!raw.deletedForStudent || !!raw.deleted_for_student
+  };
+}
+function upsertLocalMessage(msg) {
+  var existing = (state.messages||[]).filter(function(m){return m.id===msg.id;})[0];
+  if (existing) {
+    Object.keys(msg).forEach(function(k){ existing[k]=msg[k]; });
+  } else {
+    state.messages = state.messages || [];
+    state.messages.push(msg);
+  }
+  // keep newest first
+  state.messages.sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
+  saveMessages();
+}
+function adminUnreadCount() {
+  return (state.messages||[]).filter(function(m){ return !m.deletedForAdmin && m.toRole==='admin' && !m.isRead; }).length;
+}
+function studentUnreadCount(student) {
+  if (!student) return 0;
+  var cid = student.clientId || student.id;
+  return (state.messages||[]).filter(function(m){
+    if (m.deletedForStudent) return false;
+    if (m.isRead) return false;
+    if (m.fromRole !== 'admin') return false;
+    if (m.toRole==='broadcast') return true;
+    return m.toRole==='student' && String(m.toId)===String(cid);
+  }).length;
+}
+function visibleAdminMessages() {
+  var tab = state.messagesTabAdmin || 'inbox';
+  var list = (state.messages||[]).filter(function(m){ return !m.deletedForAdmin; });
+  if (tab==='inbox') return list.filter(function(m){ return m.toRole==='admin'; });
+  if (tab==='sent') return list.filter(function(m){ return m.fromRole==='admin'; });
+  return list;
+}
+function visibleStudentMessages(student) {
+  if (!student) return [];
+  var cid = String(student.clientId || student.id);
+  return (state.messages||[]).filter(function(m){
+    if (m.deletedForStudent) return false;
+    if (m.toRole==='broadcast') return true;
+    if (String(m.toId)===cid) return true;
+    if (m.fromRole==='student' && String(m.fromId)===cid) return true;
+    return false;
+  });
+}
+function formatMsgTime(iso){
+  try { var d=new Date(iso); if(isNaN(d.getTime())) return iso; return d.toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); } catch(e){ return iso; }
+}
+function msgHtml(msg, viewerRole){
+  var isOwn = (viewerRole==='admin' && msg.fromRole==='admin') || (viewerRole==='student' && msg.fromRole==='student');
+  var unread = !msg.isRead && ((viewerRole==='admin' && msg.toRole==='admin') || (viewerRole==='student' && msg.fromRole==='admin'));
+  var badgeTo = msg.toRole==='broadcast' ? '<span class="msg-badge msg-badge--broadcast">Broadcast</span>' : (msg.toRole==='student' ? '<span class="msg-badge msg-badge--student">To student</span>' : (msg.toRole==='admin' ? '<span class="msg-badge msg-badge--student">To teacher</span>' : ''));
+  var fromBadge = msg.fromRole==='admin' ? '<span class="msg-badge msg-badge--admin">'+svgIcon('shield','ico--sm')+' Teacher</span>' : '<span class="msg-badge msg-badge--student">'+svgIcon('user','ico--sm')+' Student</span>';
+  var readBadge = msg.isRead ? '<span class="msg-badge msg-badge--read">'+svgIcon('check-circle','ico--sm')+' Read</span>' : '<span class="msg-badge msg-badge--unread">'+svgIcon('mail','ico--sm')+' New</span>';
+  var name = esc(msg.fromName || (msg.fromRole==='admin'? adminDisplayName() : 'Student'));
+  var initial = (name.trim().slice(0,1)||'?').toUpperCase();
+  var avatarCls = msg.fromRole==='admin' ? ' style="background:var(--indigo-600);color:#fff"' : ' style="background:var(--emerald-100);color:var(--emerald-700)"';
+  return '<li class="msg-item '+(unread?'msg-item--unread':'')+'" role="listitem" data-msg-id="'+attr(msg.id)+'">'
+    +'<div class="msg-item__head"><div class="msg-item__from"><span class="avatar"'+avatarCls+'>'+esc(initial)+'</span><span>'+name+'</span>'+fromBadge+(isOwn?'':'')+'</div>'
+    +'<span class="msg-item__meta">'+esc(formatMsgTime(msg.createdAt))+' · '+esc(relativeTime(msg.createdAt))+' '+ (unread? readBadge : (isOwn? '<span class="msg-badge msg-badge--read">Sent</span>' : ''))+' '+badgeTo+'</span></div>'
+    +'<div class="msg-item__body">'+esc(msg.body)+'</div>'
+    +'<div class="msg-item__actions">'
+    +(unread ? '<button type="button" class="btn btn--subtle btn--xs" data-action="mark-msg-read" data-id="'+attr(msg.id)+'">'+svgIcon('check','ico--sm')+' Mark as read</button>' : '')
+    +(!isOwn && viewerRole==='admin' ? '<button type="button" class="btn btn--subtle btn--xs" data-action="reply-msg" data-id="'+attr(msg.id)+'">'+svgIcon('reply','ico--sm')+' Reply</button>' : '')
+    +(!isOwn && viewerRole==='student' ? '<button type="button" class="btn btn--subtle btn--xs" data-action="reply-msg" data-id="'+attr(msg.id)+'">'+svgIcon('reply','ico--sm')+' Reply to teacher</button>' : '')
+    +'<button type="button" class="btn btn--ghost-danger btn--xs" data-action="delete-msg" data-id="'+attr(msg.id)+'">'+svgIcon('trash','ico--sm')+' Delete</button>'
+    +'</div></li>';
+}
+function renderAdminMessages(){
+  var list = $('#admin-msg-list');
+  var empty = $('#admin-msg-empty');
+  var inboxBadge = $('#admin-inbox-badge');
+  var unreadTag = $('#admin-msg-unread-tag');
+  var unreadText = $('#admin-msg-unread-text');
+  var avatar = $('#admin-profile-avatar');
+  var nameEl = $('#admin-profile-name');
+  var sub = $('#admin-profile-sub');
+  var nameInput = $('#admin-name-input');
+  var displayInput = $('#admin-display-input');
+  var hdrBadge = $('#header-msg-badge-admin');
+  var notice = $('#admin-new-msg-notice');
+  var noticeCount = $('#admin-new-msg-count');
+  if (nameEl) nameEl.textContent = adminDisplayName();
+  if (sub) sub.textContent = 'Students see “From: ' + adminDisplayName() + '”. Save a friendly, professional name.';
+  if (avatar) avatar.textContent = (adminDisplayName().trim().slice(0,1) || 'T').toUpperCase();
+  if (nameInput && document.activeElement!==nameInput) nameInput.value = state.settings.adminDisplayName || '';
+  if (displayInput && document.activeElement!==displayInput) displayInput.value = state.settings.adminDisplayName || '';
+  // recipient selects
+  var recSel = $('#admin-msg-recipient');
+  var stuSel = $('#admin-msg-student');
+  var stuField = $('#admin-msg-student-field');
+  if (recSel){
+    var years = state.settings.years || DEFAULT_YEARS;
+    var cur = recSel.value;
+    var opts = ['<option value="broadcast">All students (broadcast)</option>'];
+    years.forEach(function(y){ opts.push('<option value="year:'+attr(y)+'">All in '+esc(y)+'</option>'); });
+    opts.push('<option value="student">One student…</option>');
+    recSel.innerHTML = opts.join('');
+    if (cur) recSel.value = cur;
+    if (stuField) stuField.hidden = recSel.value !== 'student';
+  }
+  if (stuSel){
+    var keep = stuSel.value;
+    var students = (state.students||[]).slice().sort(function(a,b){return String(a.firstName).localeCompare(String(b.firstName));});
+    var o = students.map(function(s){ return '<option value="'+attr(s.id)+'">'+esc(s.firstName+' — '+s.year+' ('+s.username+')')+'</option>'; });
+    stuSel.innerHTML = o.join('') || '<option value="">No students yet</option>';
+    if (keep) stuSel.value = keep;
+  }
+  var unread = adminUnreadCount();
+  if (hdrBadge){ hdrBadge.textContent = unread>99?'99+':String(unread); hdrBadge.hidden = unread===0; }
+  if (inboxBadge){
+    var inboxUnread = (state.messages||[]).filter(function(m){return !m.deletedForAdmin && m.toRole==='admin' && !m.isRead;}).length;
+    inboxBadge.textContent = inboxUnread>99?'99+':String(inboxUnread);
+    inboxBadge.hidden = inboxUnread===0;
+  }
+  if (unreadTag){ unreadTag.hidden = unread===0; if (unreadText) unreadText.textContent = unread + ' new'; }
+  if (notice){ notice.hidden = unread===0; if (noticeCount) noticeCount.textContent = String(unread); }
+  // active tab
+  $$('[data-action="switch-admin-msg-tab"]').forEach(function(btn){
+    var isActive = btn.dataset.tab=== (state.messagesTabAdmin||'inbox');
+    btn.setAttribute('aria-selected', isActive? 'true':'false');
+    if (isActive){ btn.style.background='#fff'; btn.style.boxShadow='var(--shadow-xs)'; btn.style.color='var(--indigo-700)'; } else { btn.style.background=''; btn.style.boxShadow=''; btn.style.color=''; }
+  });
+  // list
+  var visible = visibleAdminMessages();
+  if (list){
+    if (!visible.length){
+      list.innerHTML = '';
+      if (empty) empty.hidden = false;
+    } else {
+      if (empty) empty.hidden = true;
+      list.innerHTML = visible.slice(0,60).map(function(m){return msgHtml(m,'admin');}).join('');
+    }
+  }
+  var hdrBtn = $('#header-msg-admin');
+  if (hdrBtn) hdrBtn.hidden = !currentAdmin();
+}
+function renderStudentMessages(){
+  var student = currentStudent();
+  var list = $('#student-msg-list');
+  var empty = $('#student-msg-empty');
+  var badge = $('#student-msg-badge');
+  var hdrBadge = $('#header-msg-badge-student');
+  var notice = $('#student-new-msg-notice');
+  var noticeCount = $('#student-new-msg-count');
+  var chip = $('#student-msg-teacher-chip');
+  var chipName = $('#student-msg-teacher-name');
+  var teacherName = adminDisplayName();
+  if (chip){ chip.hidden = !student; if (chipName) chipName.textContent = teacherName; }
+  var unread = student ? studentUnreadCount(student) : 0;
+  if (badge){ badge.textContent = unread>99?'99+':String(unread); badge.hidden = unread===0; }
+  if (hdrBadge){ hdrBadge.textContent = unread>99?'99+':String(unread); hdrBadge.hidden = unread===0; }
+  if (notice){ notice.hidden = unread===0; if (noticeCount) noticeCount.textContent = String(unread); }
+  var hdrBtn = $('#header-msg-student');
+  if (hdrBtn) hdrBtn.hidden = !student;
+  if (!student){
+    if (list) list.innerHTML='';
+    if (empty) empty.hidden = false;
+    return;
+  }
+  var visible = visibleStudentMessages(student);
+  if (list){
+    if (!visible.length){
+      list.innerHTML='';
+      if (empty) empty.hidden = false;
+    } else {
+      if (empty) empty.hidden = true;
+      list.innerHTML = visible.slice(0,60).map(function(m){return msgHtml(m,'student');}).join('');
+    }
+  }
+}
+function updateMessageBadges(){
+  try { renderAdminMessages(); renderStudentMessages(); } catch(e){ recordDiagnostic('render', errorText(e), 'updateMessageBadges'); }
+}
+function refreshMessages(force){
+  // throttle: at most once per 10s unless forced
+  if (!force && state.messagesLoading) return Promise.resolve();
+  if (!force && state.messagesLoadedAt && Date.now()-state.messagesLoadedAt < 10000) return Promise.resolve();
+  state.messagesLoading = true;
+  var role = null, actorId = null;
+  if (currentAdmin()){ role='admin'; actorId='admin'; }
+  else if (currentStudent()){ role='student'; actorId=currentStudent().id; }
+  else { state.messagesLoading=false; updateMessageBadges(); return Promise.resolve(); }
+  if (!syncReady() || !syncActive()){
+    state.messagesLoading=false;
+    state.messagesLoadedAt=Date.now();
+    updateMessageBadges();
+    return Promise.resolve();
+  }
+  return syncRpc('madv_list_messages', { p_actor_role: role, p_actor_id: actorId, p_admin_user: state.settings.adminUser||'', p_admin_pass: state.settings.adminPass||'' })
+    .then(function(data){
+      state.messagesLoading=false;
+      state.messagesLoadedAt=Date.now();
+      if (data && data.ok && Array.isArray(data.messages)){
+        var mapped = data.messages.map(function(r){ return normalizeMessage(r); }).filter(Boolean);
+        // merge: replace server messages, keep local pending? For now server is source of truth when online
+        // Keep only server messages plus any local messages not yet synced? Simpler: replace
+        state.messages = mapped;
+        saveMessages();
+      }
+      updateMessageBadges();
+    }).catch(function(err){
+      state.messagesLoading=false;
+      updateMessageBadges();
+    });
+}
+function adminSendMessage(){
+  var recSel = $('#admin-msg-recipient');
+  var stuSel = $('#admin-msg-student');
+  var bodyEl = $('#admin-msg-body');
+  var status = $('#admin-msg-status');
+  var body = bodyEl ? sanitizeMsgBody(bodyEl.value) : '';
+  if (!body){ toast('Write a message before sending.', 'warn'); return; }
+  if (!currentAdmin()){ openAdminAuth(); return; }
+  var toRole='broadcast', toId=null;
+  var recVal = recSel ? recSel.value : 'broadcast';
+  if (recVal==='broadcast'){ toRole='broadcast'; toId=null; }
+  else if (recVal.indexOf('year:')===0){
+    var yearVal = recVal.slice(5);
+    var targeted = (state.students||[]).filter(function(s){return s.year===yearVal;});
+    if (!targeted.length){ toast('No students in '+yearVal+' yet.', 'warn'); return; }
+    // send one per student
+    var btn = document.querySelector('[data-action="admin-send-message"]');
+    if (btn) btn.disabled=true;
+    var sends = targeted.map(function(s){
+      var msgBody = body;
+      if (syncReady() && syncActive()){
+        return syncRpc('madv_send_message', { p_from_role:'admin', p_from_id:'admin', p_from_name: adminDisplayName(), p_to_role:'student', p_to_id: s.id, p_body: msgBody, p_admin_user: state.settings.adminUser||'', p_admin_pass: state.settings.adminPass||'' })
+          .then(function(data){ if (data && data.ok && data.message) upsertLocalMessage(normalizeMessage(data.message)); })
+          .catch(function(err){ var local=normalizeMessage({id:msgId(), createdAt:new Date().toISOString(), fromRole:'admin', fromId:'admin', fromName:adminDisplayName(), toRole:'student', toId:s.id, body:msgBody, isRead:false, deletedForAdmin:false, deletedForStudent:false}); upsertLocalMessage(local); });
+      } else {
+        var local=normalizeMessage({id:msgId(), createdAt:new Date().toISOString(), fromRole:'admin', fromId:'admin', fromName:adminDisplayName(), toRole:'student', toId:s.id, body:msgBody, isRead:false, deletedForAdmin:false, deletedForStudent:false});
+        upsertLocalMessage(local);
+        return Promise.resolve();
+      }
+    });
+    Promise.all(sends).then(function(){
+      if (btn) btn.disabled=false;
+      if (bodyEl) bodyEl.value='';
+      var cnt=$('#admin-msg-count'); if(cnt) cnt.textContent='0';
+      if (status) status.textContent='Sent to '+targeted.length+' student(s) in '+yearVal+'.';
+      updateMessageBadges();
+      toast('Message sent to '+targeted.length+' student(s) in '+yearVal+'.', 'success');
+      if (syncReady()) refreshMessages(true);
+    });
+    return;
+  }
+  else if (recVal==='student'){
+    var sid = stuSel ? stuSel.value : '';
+    if (!sid){ toast('Choose a student to message.', 'warn'); return; }
+    toRole='student'; toId=sid;
+  }
+  var btn2 = document.querySelector('[data-action="admin-send-message"]');
+  if (btn2) btn2.disabled=true;
+  var doSend = function(){
+    if (syncReady() && syncActive()){
+      return syncRpc('madv_send_message', { p_from_role:'admin', p_from_id:'admin', p_from_name: adminDisplayName(), p_to_role: toRole, p_to_id: toId, p_body: body, p_admin_user: state.settings.adminUser||'', p_admin_pass: state.settings.adminPass||'' })
+        .then(function(data){
+          if (data && data.ok && data.message){
+            upsertLocalMessage(normalizeMessage(data.message));
+          } else {
+            var local=normalizeMessage({id:msgId(), createdAt:new Date().toISOString(), fromRole:'admin', fromId:'admin', fromName:adminDisplayName(), toRole:toRole, toId:toId, body:body, isRead:false, deletedForAdmin:false, deletedForStudent:false});
+            upsertLocalMessage(local);
+          }
+        }).catch(function(err){
+          var local=normalizeMessage({id:msgId(), createdAt:new Date().toISOString(), fromRole:'admin', fromId:'admin', fromName:adminDisplayName(), toRole:toRole, toId:toId, body:body, isRead:false, deletedForAdmin:false, deletedForStudent:false});
+          upsertLocalMessage(local);
+          if (err && err.fatal) throw err;
+        });
+    } else {
+      var local=normalizeMessage({id:msgId(), createdAt:new Date().toISOString(), fromRole:'admin', fromId:'admin', fromName:adminDisplayName(), toRole:toRole, toId:toId, body:body, isRead:false, deletedForAdmin:false, deletedForStudent:false});
+      upsertLocalMessage(local);
+      return Promise.resolve();
+    }
+  };
+  doSend().then(function(){
+    if (btn2) btn2.disabled=false;
+    if (bodyEl) bodyEl.value='';
+    var cnt2=$('#admin-msg-count'); if(cnt2) cnt2.textContent='0';
+    if (status) status.textContent='Message sent.';
+    updateMessageBadges();
+    toast(toRole==='broadcast' ? 'Broadcast sent to all students.' : 'Message sent.', 'success');
+    if (syncReady()) refreshMessages(true);
+  }).catch(function(err){
+    if (btn2) btn2.disabled=false;
+    toast(err.message||'Could not send message.', 'error');
+  });
+}
+function studentSendMessage(){
+  var bodyEl = $('#student-msg-body');
+  var status = $('#student-msg-status');
+  var body = bodyEl ? sanitizeMsgBody(bodyEl.value) : '';
+  if (!body){ toast('Write a message before sending.', 'warn'); return; }
+  var student = currentStudent();
+  if (!student){ openStudentAuth('login'); return; }
+  var btn = document.querySelector('[data-action="student-send-message"]');
+  if (btn) btn.disabled=true;
+  var doSend = function(){
+    if (syncReady() && syncActive()){
+      return syncRpc('madv_send_message', { p_from_role:'student', p_from_id: student.id, p_from_name: student.firstName, p_to_role:'admin', p_to_id:'admin', p_body: body, p_admin_user:'', p_admin_pass:'' })
+        .then(function(data){
+          if (data && data.ok && data.message) upsertLocalMessage(normalizeMessage(data.message));
+          else {
+            var local=normalizeMessage({id:msgId(), createdAt:new Date().toISOString(), fromRole:'student', fromId:student.id, fromName:student.firstName, toRole:'admin', toId:'admin', body:body, isRead:false, deletedForAdmin:false, deletedForStudent:false});
+            upsertLocalMessage(local);
+          }
+        }).catch(function(err){
+          var local=normalizeMessage({id:msgId(), createdAt:new Date().toISOString(), fromRole:'student', fromId:student.id, fromName:student.firstName, toRole:'admin', toId:'admin', body:body, isRead:false, deletedForAdmin:false, deletedForStudent:false});
+          upsertLocalMessage(local);
+          if (err && err.fatal && /blocked/.test(err.message)) throw err;
+        });
+    } else {
+      var local2=normalizeMessage({id:msgId(), createdAt:new Date().toISOString(), fromRole:'student', fromId:student.id, fromName:student.firstName, toRole:'admin', toId:'admin', body:body, isRead:false, deletedForAdmin:false, deletedForStudent:false});
+      upsertLocalMessage(local2);
+      return Promise.resolve();
+    }
+  };
+  doSend().then(function(){
+    if (btn) btn.disabled=false;
+    if (bodyEl) bodyEl.value='';
+    var cnt=$('#student-msg-count'); if(cnt) cnt.textContent='0';
+    if (status) status.textContent='Message sent to teacher.';
+    updateMessageBadges();
+    toast('Message sent to your teacher — they will reply here.', 'success');
+    if (syncReady()) refreshMessages(true);
+  }).catch(function(err){
+    if (btn) btn.disabled=false;
+    toast(err.message||'Could not send message.', 'error');
+  });
+}
+function markMsgRead(id){
+  var msg = (state.messages||[]).filter(function(m){return m.id===id;})[0];
+  if (!msg) return;
+  var role = currentAdmin() ? 'admin' : (currentStudent()? 'student' : null);
+  if (!role) return;
+  msg.isRead = true;
+  saveMessages();
+  updateMessageBadges();
+  if (!syncReady() || !syncActive()) return;
+  var actorId = role==='admin' ? 'admin' : currentStudent().id;
+  syncRpc('madv_mark_message_read', { p_message_id: id, p_actor_role: role, p_actor_id: actorId, p_admin_user: state.settings.adminUser||'', p_admin_pass: state.settings.adminPass||'' }).catch(function(){});
+}
+function deleteMsg(id){
+  var role = currentAdmin() ? 'admin' : (currentStudent()? 'student' : null);
+  if (!role) return;
+  var msg = (state.messages||[]).filter(function(m){return m.id===id;})[0];
+  if (!msg) return;
+  var actorId = role==='admin' ? 'admin' : currentStudent().id;
+  if (role==='admin') msg.deletedForAdmin = true;
+  else msg.deletedForStudent = true;
+  // if both deleted, remove
+  if (msg.deletedForAdmin && msg.deletedForStudent){
+    state.messages = state.messages.filter(function(m){return m.id!==id;});
+  }
+  saveMessages();
+  updateMessageBadges();
+  toast('Message deleted.', 'success');
+  if (syncReady() && syncActive()){
+    syncRpc('madv_delete_message', { p_message_id: id, p_actor_role: role, p_actor_id: actorId, p_admin_user: state.settings.adminUser||'', p_admin_pass: state.settings.adminPass||'' }).catch(function(){});
+  }
+}
+window.adminDisplayName = adminDisplayName;
+window.refreshMessages = refreshMessages;
+window.adminSendMessage = adminSendMessage;
+window.studentSendMessage = studentSendMessage;
+window.markMsgRead = markMsgRead;
+window.deleteMsg = deleteMsg;
+function replyToMsg(id){
+  var msg = (state.messages||[]).filter(function(m){return m.id===id;})[0];
+  if (!msg) return;
+  if (currentAdmin()){
+    // set recipient to student who sent it, or broadcast? If broadcast inbound is student->admin, reply to that student
+    var recSel = $('#admin-msg-recipient');
+    var stuSel = $('#admin-msg-student');
+    var bodyEl = $('#admin-msg-body');
+    if (msg.fromRole==='student'){
+      if (recSel) recSel.value='student';
+      var field = $('#admin-msg-student-field'); if (field) field.hidden=false;
+      if (stuSel) stuSel.value = msg.fromId;
+      if (bodyEl){ bodyEl.focus(); bodyEl.value = 'Hi '+msg.fromName+', '; bodyEl.dispatchEvent(new Event('input'));
+        var cnt=$('#admin-msg-count'); if(cnt) cnt.textContent=String(bodyEl.value.length);
+      }
+      document.getElementById('admin-messages-panel')?.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  } else if (currentStudent()){
+    var bodyEl2 = $('#student-msg-body');
+    if (bodyEl2){ bodyEl2.focus(); bodyEl2.value = ''; bodyEl2.dispatchEvent(new Event('input')); }
+    document.getElementById('student-messages-panel')?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+}
+
 function exportStudentsCsv() {
   var rows = [['First name', 'Year level', 'Username', 'Password', 'Registered', 'Last visit', 'Visits',
     'Downloads recorded', 'Abacus downloads', 'Files downloaded', 'Last download', 'Status']];
@@ -6583,6 +7237,14 @@ function saveOptions() {
   toast('Behaviour and defaults saved.', 'success');
 }
 function saveAdminCredentials() {
+  var dispEl = $('#admin-display-input');
+  if (dispEl){
+    var dispVal = dispEl.value.trim().slice(0,60);
+    if (dispVal !== (state.settings.adminDisplayName||'')){
+      state.settings.adminDisplayName = dispVal;
+      saveSettings();
+    }
+  }
   var user = ($('#admin-user-input').value || '').trim();
   var pass = $('#admin-pass-input').value;
   if (!user) { toast('Enter the admin username.', 'error'); return; }
@@ -7153,6 +7815,44 @@ function openHelp() {
 
 /* ------------------------------- Action map ------------------------------ */
 var ACTIONS = {
+  'save-admin-name': function(){
+    var v = ($('#admin-name-input') && $('#admin-name-input').value) || ($('#admin-display-input') && $('#admin-display-input').value) || '';
+    saveAdminDisplayName(v);
+  },
+  'admin-send-message': function(){ adminSendMessage(); },
+  'student-send-message': function(){ studentSendMessage(); },
+  'mark-msg-read': function(el){ markMsgRead(el.dataset.id); },
+  'delete-msg': function(el){
+    var role = currentAdmin() ? 'admin' : 'student';
+    confirmDialog({title:'Delete this message?', message: role==='admin' ? 'It will be removed from your inbox. The student still sees it until they delete it.' : 'It will be removed for you. Your teacher still sees it until they delete it.', confirmLabel:'Delete', danger:true}).then(function(ok){ if(ok) deleteMsg(el.dataset.id); });
+  },
+  'reply-msg': function(el){ replyToMsg(el.dataset.id); },
+  'switch-admin-msg-tab': function(el){
+    state.messagesTabAdmin = el.dataset.tab || 'inbox';
+    renderAdminMessages();
+  },
+  'refresh-messages': function(){ refreshMessages(true).then(function(){ toast('Messages refreshed.', 'success'); }); },
+  'mark-all-admin-read': function(){
+    (state.messages||[]).forEach(function(m){ if(!m.deletedForAdmin && m.toRole==='admin' && !m.isRead) { m.isRead=true; if(syncReady()&&syncActive()) syncRpc('madv_mark_message_read', {p_message_id:m.id,p_actor_role:'admin',p_actor_id:'admin',p_admin_user:state.settings.adminUser||'',p_admin_pass:state.settings.adminPass||''}).catch(function(){}); } });
+    saveMessages(); updateMessageBadges(); toast('All inbox messages marked as read.', 'success');
+  },
+  'mark-all-student-read': function(){
+    var st=currentStudent(); if(!st) return;
+    var cid=String(st.id);
+    (state.messages||[]).forEach(function(m){ if(m.deletedForStudent) return; if(m.isRead) return; if(m.fromRole!=='admin') return; if(m.toRole==='broadcast' || String(m.toId)===cid){ m.isRead=true; if(syncReady()&&syncActive()) syncRpc('madv_mark_message_read', {p_message_id:m.id,p_actor_role:'student',p_actor_id:cid,p_admin_user:'',p_admin_pass:''}).catch(function(){}); } });
+    saveMessages(); updateMessageBadges(); toast('All teacher messages marked as read.', 'success');
+  },
+  'scroll-to-admin-messages': function(){
+    if(!currentAdmin()) return openAdminAuth();
+    showView('dashboard');
+    setTimeout(function(){ var el=document.getElementById('admin-messages-panel'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); refreshMessages(true); }, 120);
+  },
+  'scroll-to-student-messages': function(){
+    var st=currentStudent(); if(!st) return openStudentAuth('login');
+    showView('my-learning');
+    setTimeout(function(){ var el=document.getElementById('student-messages-panel'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); refreshMessages(true); }, 120);
+  },
+  'open-admin-messages': function(){ var a=ACTIONS['scroll-to-admin-messages']; if(a) a(); },
   'go-home': function () { showView('library'); renderLibrary(); },
   'go-upload': function () { if (!currentAdmin()) return openAdminAuth(); showView('upload'); updateUploadMode(); },
   'go-settings': function () { if (!currentAdmin()) return openAdminAuth(); showView('settings'); renderSettings(); },
@@ -7462,6 +8162,11 @@ var ACTIONS = {
   'clear-diagnostics': function () {
     clearDiagnostics();
     renderDiagnostics();
+  var disp = $('#admin-display-input');
+  if (disp && document.activeElement!==disp) disp.value = state.settings.adminDisplayName || '';
+  var nameIn = $('#admin-name-input');
+  if (nameIn && document.activeElement!==nameIn) nameIn.value = state.settings.adminDisplayName || '';
+  try { updateMessageBadges(); } catch(e){}
     toast('Diagnostics cleared.', 'success');
   }
 };
@@ -7624,6 +8329,13 @@ function wireEvents() {
   var maxSize = $('#opt-max-size');
   if (maxSize) maxSize.addEventListener('input', function () { maxSize.dataset.touched = '1'; });
 
+  // Messaging: character counts
+  var adminBody = $('#admin-msg-body');
+  if (adminBody) adminBody.addEventListener('input', function(){ var c=$('#admin-msg-count'); if(c) c.textContent=String(adminBody.value.length); });
+  var stuBody = $('#student-msg-body');
+  if (stuBody) stuBody.addEventListener('input', function(){ var c=$('#student-msg-count'); if(c) c.textContent=String(stuBody.value.length); });
+  var adminRec = $('#admin-msg-recipient');
+  if (adminRec) adminRec.addEventListener('change', function(){ var f=$('#admin-msg-student-field'); if(f) f.hidden = adminRec.value!=='student'; });
   var dropzoneKey = $('#dropzone');
   if (dropzoneKey) dropzoneKey.addEventListener('keydown', function (event) {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -7698,6 +8410,8 @@ function refreshRelativeTimes() {
     if (abacusQueue().length) abacusFlushQueue();
   }
   if (syncReady() && state.cloud.online !== false && navigator.onLine !== false) syncQueueFlush();
+  if (currentAdmin() || currentStudent()) refreshMessages(false);
+  try { updateMessageBadges(); } catch(e){}
 }
 function init() {
   // The previous release enabled public analytics writes by default. Reset that
@@ -7773,6 +8487,9 @@ function init() {
     }
   }
   setInterval(refreshRelativeTimes, 60000);
+  setInterval(function(){ if (currentAdmin() || currentStudent()) refreshMessages(false); }, 30000);
+  // Initial messages load
+  setTimeout(function(){ refreshMessages(true); }, 800);
   if (!repoParts()) {
     setTimeout(function () {
       toast('Add the repository and access token in Cloud settings to publish files for every student device.', 'info');

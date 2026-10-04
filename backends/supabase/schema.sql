@@ -792,6 +792,320 @@ begin
 end;
 $$;
 
+
+-- -------------------------------------------------------- messages
+create table if not exists public.madv_messages (
+  id                  uuid primary key default gen_random_uuid(),
+  created_at          timestamptz not null default now(),
+  from_role           text not null check (from_role in ('admin','student')),
+  from_id             text not null,
+  from_name           text not null,
+  to_role             text not null check (to_role in ('admin','student','broadcast')),
+  to_id               text,
+  body                text not null check (char_length(body) between 1 and 2000),
+  is_read             boolean not null default false,
+  deleted_for_admin   boolean not null default false,
+  deleted_for_student boolean not null default false
+);
+create table if not exists public.madv_broadcast_reads (
+  message_id uuid not null references public.madv_messages(id) on delete cascade,
+  student_id text not null,
+  read_at timestamptz not null default now(),
+  primary key (message_id, student_id)
+);
+create table if not exists public.madv_broadcast_deletions (
+  message_id uuid not null references public.madv_messages(id) on delete cascade,
+  student_id text not null,
+  created_at timestamptz not null default now(),
+  primary key (message_id, student_id)
+);
+create index if not exists madv_messages_to_idx on public.madv_messages (to_id);
+create index if not exists madv_messages_from_idx on public.madv_messages (from_id);
+create index if not exists madv_messages_created_idx on public.madv_messages (created_at desc);
+
+create or replace function public.madv_message_json(p_row public.madv_messages)
+returns jsonb
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select jsonb_build_object(
+    'id', p_row.id,
+    'createdAt', to_char(p_row.created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+    'fromRole', p_row.from_role,
+    'fromId', p_row.from_id,
+    'fromName', p_row.from_name,
+    'toRole', p_row.to_role,
+    'toId', p_row.to_id,
+    'body', p_row.body,
+    'isRead', p_row.is_read
+  );
+$$;
+
+create or replace function public.madv_send_message(
+  p_from_role  text,
+  p_from_id    text,
+  p_from_name  text,
+  p_to_role    text,
+  p_to_id      text default null,
+  p_body       text default '',
+  p_admin_user text default null,
+  p_admin_pass text default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_body text;
+  v_name text;
+  v_row  public.madv_messages;
+  v_student public.madv_students;
+begin
+  v_body := btrim(coalesce(p_body, ''));
+  if char_length(v_body) < 1 or char_length(v_body) > 2000 then
+    return jsonb_build_object('ok', false, 'error', 'Message must be 1 to 2000 characters.');
+  end if;
+  if p_from_role not in ('admin','student') then
+    return jsonb_build_object('ok', false, 'error', 'Invalid sender role.');
+  end if;
+  if p_to_role not in ('admin','student','broadcast') then
+    return jsonb_build_object('ok', false, 'error', 'Invalid recipient.');
+  end if;
+
+  if p_from_role = 'admin' then
+    if not public.madv_admin_check(p_admin_user, p_admin_pass) then
+      return jsonb_build_object('ok', false, 'error', 'Administrator sign-in was not accepted.');
+    end if;
+    v_name := btrim(coalesce(p_from_name, ''));
+    if v_name = '' then v_name := coalesce(p_admin_user, 'Teacher'); end if;
+    v_name := left(v_name, 60);
+    if p_to_role = 'broadcast' then
+      -- broadcast to all students
+      insert into public.madv_messages (from_role, from_id, from_name, to_role, to_id, body, is_read)
+      values ('admin', coalesce(nullif(p_from_id,''), 'admin'), v_name, 'broadcast', null, v_body, false)
+      returning * into v_row;
+    elsif p_to_role = 'student' then
+      if p_to_id is null or p_to_id = '' then
+        return jsonb_build_object('ok', false, 'error', 'Choose a student to message.');
+      end if;
+      select * into v_student from public.madv_students where client_id = p_to_id;
+      if not found then
+        return jsonb_build_object('ok', false, 'error', 'Student not found.');
+      end if;
+      insert into public.madv_messages (from_role, from_id, from_name, to_role, to_id, body, is_read)
+      values ('admin', coalesce(nullif(p_from_id,''), 'admin'), v_name, 'student', p_to_id, v_body, false)
+      returning * into v_row;
+    else
+      return jsonb_build_object('ok', false, 'error', 'Admin can only message students or broadcast.');
+    end if;
+  else
+    -- student -> admin
+    if p_to_role <> 'admin' then
+      return jsonb_build_object('ok', false, 'error', 'Students can only message the teacher.');
+    end if;
+    select * into v_student from public.madv_students where client_id = p_from_id;
+    if not found then
+      return jsonb_build_object('ok', false, 'error', 'Student not found. Please register again.');
+    end if;
+    if v_student.status = 'blocked' then
+      return jsonb_build_object('ok', false, 'error', 'This account has been blocked by the teacher.');
+    end if;
+    v_name := v_student.first_name;
+    insert into public.madv_messages (from_role, from_id, from_name, to_role, to_id, body, is_read)
+    values ('student', p_from_id, v_name, 'admin', 'admin', v_body, false)
+    returning * into v_row;
+  end if;
+
+  return jsonb_build_object('ok', true, 'message', public.madv_message_json(v_row));
+end;
+$$;
+
+create or replace function public.madv_list_messages(
+  p_actor_role text,
+  p_actor_id   text,
+  p_admin_user text default null,
+  p_admin_pass text default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_msgs jsonb;
+  v_student public.madv_students;
+begin
+  if p_actor_role = 'admin' then
+    if not public.madv_admin_check(p_admin_user, p_admin_pass) then
+      return jsonb_build_object('ok', false, 'error', 'Administrator sign-in was not accepted.');
+    end if;
+    select coalesce(jsonb_agg(public.madv_message_json(m) order by m.created_at desc), '[]'::jsonb)
+      into v_msgs
+      from public.madv_messages m
+     where m.deleted_for_admin = false
+       and (m.from_role = 'admin' or m.to_role = 'admin' or m.to_role = 'broadcast');
+  elsif p_actor_role = 'student' then
+    select * into v_student from public.madv_students where client_id = p_actor_id;
+    if not found then
+      return jsonb_build_object('ok', false, 'error', 'Student not found.');
+    end if;
+    if v_student.status = 'blocked' then
+      return jsonb_build_object('ok', false, 'error', 'This account has been blocked.');
+    end if;
+    select coalesce(jsonb_agg(
+      jsonb_build_object(
+        'id', m.id,
+        'createdAt', to_char(m.created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+        'fromRole', m.from_role,
+        'fromId', m.from_id,
+        'fromName', m.from_name,
+        'toRole', m.to_role,
+        'toId', m.to_id,
+        'body', m.body,
+        'isRead', case when m.to_role='broadcast' then exists(select 1 from public.madv_broadcast_reads r where r.message_id=m.id and r.student_id=p_actor_id) else m.is_read end
+      ) order by m.created_at desc), '[]'::jsonb)
+      into v_msgs
+      from public.madv_messages m
+     where
+       (
+         (m.to_role='broadcast' and not exists (select 1 from public.madv_broadcast_deletions d where d.message_id=m.id and d.student_id=p_actor_id))
+         or (m.to_role='student' and m.to_id=p_actor_id and m.deleted_for_student=false)
+         or (m.from_role='student' and m.from_id=p_actor_id and m.deleted_for_student=false)
+       );
+  else
+    return jsonb_build_object('ok', false, 'error', 'Invalid role.');
+  end if;
+  return jsonb_build_object('ok', true, 'messages', v_msgs);
+end;
+$$;
+
+create or replace function public.madv_mark_message_read(
+  p_message_id uuid,
+  p_actor_role text,
+  p_actor_id   text,
+  p_admin_user text default null,
+  p_admin_pass text default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_row public.madv_messages;
+  v_is_broadcast boolean;
+begin
+  if p_actor_role = 'admin' then
+    if not public.madv_admin_check(p_admin_user, p_admin_pass) then
+      return jsonb_build_object('ok', false, 'error', 'Administrator sign-in was not accepted.');
+    end if;
+    update public.madv_messages
+       set is_read = true
+     where id = p_message_id
+       and deleted_for_admin = false
+       and to_role = 'admin'
+    returning * into v_row;
+    if not found then
+      return jsonb_build_object('ok', false, 'error', 'Message not found or not addressed to you.');
+    end if;
+  elsif p_actor_role = 'student' then
+    if not exists (select 1 from public.madv_students where client_id = p_actor_id and status <> 'blocked') then
+      return jsonb_build_object('ok', false, 'error', 'Student not found.');
+    end if;
+    select (to_role='broadcast') into v_is_broadcast from public.madv_messages where id=p_message_id;
+    if v_is_broadcast is null then
+      return jsonb_build_object('ok', false, 'error', 'Message not found.');
+    end if;
+    if v_is_broadcast then
+      -- per-student read for broadcast
+      if exists (select 1 from public.madv_broadcast_deletions where message_id=p_message_id and student_id=p_actor_id) then
+        return jsonb_build_object('ok', false, 'error', 'Message not found.');
+      end if;
+      insert into public.madv_broadcast_reads (message_id, student_id) values (p_message_id, p_actor_id)
+      on conflict do nothing;
+      select * into v_row from public.madv_messages where id=p_message_id;
+    else
+      update public.madv_messages
+         set is_read = true
+       where id = p_message_id
+         and deleted_for_student = false
+         and to_role = 'student' and to_id = p_actor_id
+      returning * into v_row;
+      if not found then
+        return jsonb_build_object('ok', false, 'error', 'Message not found.');
+      end if;
+    end if;
+  else
+    return jsonb_build_object('ok', false, 'error', 'Invalid role.');
+  end if;
+  return jsonb_build_object('ok', true, 'message', public.madv_message_json(v_row));
+end;
+$$;
+
+create or replace function public.madv_delete_message(
+  p_message_id uuid,
+  p_actor_role text,
+  p_actor_id   text,
+  p_admin_user text default null,
+  p_admin_pass text default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_row public.madv_messages;
+  v_is_broadcast boolean;
+begin
+  if p_actor_role = 'admin' then
+    if not public.madv_admin_check(p_admin_user, p_admin_pass) then
+      return jsonb_build_object('ok', false, 'error', 'Administrator sign-in was not accepted.');
+    end if;
+    update public.madv_messages
+       set deleted_for_admin = true
+     where id = p_message_id
+       and deleted_for_admin = false
+       and (from_role = 'admin' or to_role = 'admin' or to_role = 'broadcast')
+    returning * into v_row;
+    if not found then
+      return jsonb_build_object('ok', false, 'error', 'Message not found.');
+    end if;
+    -- for broadcast, also clean per-student auxiliary rows when admin deletes
+    -- physically delete only if no student still needs it: when broadcast deleted for admin and no per-student data matters, keep row for students unless all deleted? Keep row.
+    -- For non-broadcast, delete if both sides deleted
+    if v_row.to_role <> 'broadcast' then
+      delete from public.madv_messages where id = p_message_id and deleted_for_admin = true and deleted_for_student = true;
+    end if;
+  elsif p_actor_role = 'student' then
+    if not exists (select 1 from public.madv_students where client_id = p_actor_id) then
+      return jsonb_build_object('ok', false, 'error', 'Student not found.');
+    end if;
+    select (to_role='broadcast') into v_is_broadcast from public.madv_messages where id=p_message_id;
+    if v_is_broadcast is null then
+      return jsonb_build_object('ok', false, 'error', 'Message not found.');
+    end if;
+    if v_is_broadcast then
+      insert into public.madv_broadcast_deletions (message_id, student_id) values (p_message_id, p_actor_id)
+      on conflict do nothing;
+      select * into v_row from public.madv_messages where id=p_message_id;
+    else
+      update public.madv_messages
+         set deleted_for_student = true
+       where id = p_message_id
+         and deleted_for_student = false
+         and (to_id = p_actor_id or (from_role = 'student' and from_id = p_actor_id))
+      returning * into v_row;
+      if not found then
+        return jsonb_build_object('ok', false, 'error', 'Message not found.');
+      end if;
+      delete from public.madv_messages where id = p_message_id and deleted_for_admin = true and deleted_for_student = true;
+    end if;
+  else
+    return jsonb_build_object('ok', false, 'error', 'Invalid role.');
+  end if;
+  return jsonb_build_object('ok', true, 'deleted', true);
+end;
+$$;
+
 -- --------------------------------------------------------- RLS & grants
 -- Turn on Row Level Security everywhere and revoke direct table access. The
 -- page can then only do what the functions above allow.
@@ -805,6 +1119,9 @@ alter table public.madv_download_events  enable row level security;
 alter table public.madv_downloads        enable row level security;
 alter table public.madv_visits           enable row level security;
 alter table public.madv_logins           enable row level security;
+alter table public.madv_messages         enable row level security;
+alter table public.madv_broadcast_reads    enable row level security;
+alter table public.madv_broadcast_deletions enable row level security;
 
 revoke all on all tables in schema public from anon, authenticated;
 revoke all on all sequences in schema public from anon, authenticated;
@@ -824,6 +1141,11 @@ grant execute on function public.madv_login(text, text) to anon;
 grant execute on function public.madv_admin_export(text, text, text) to anon;
 grant execute on function public.madv_admin_student(text, jsonb, text, text) to anon;
 grant execute on function public.madv_admin_config(jsonb, text, text) to anon;
+grant execute on function public.madv_send_message(text, text, text, text, text, text, text, text) to anon;
+grant execute on function public.madv_list_messages(text, text, text, text) to anon;
+grant execute on function public.madv_mark_message_read(uuid, text, text, text, text) to anon;
+grant execute on function public.madv_delete_message(uuid, text, text, text, text) to anon;
+
 
 -- PostgREST caches the schema; reload it so the new functions appear at once.
 notify pgrst, 'reload schema';
