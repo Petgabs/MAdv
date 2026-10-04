@@ -1,7 +1,7 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T17:36:20.219Z",
+  "updatedAt": "2026-10-04T17:36:27.898Z",
   "resources": [
     {
       "id": "res_mutw4iuyw6ig74",
@@ -23,29 +23,6 @@
       "visible": true,
       "visibility": "all",
       "path": "resources/Year 11/Sydney Boys 2026 w. sol.pdf",
-      "source": "cloud",
-      "published": true
-    },
-    {
-      "id": "res_mutwibzru6h7ua",
-      "title": "Gosford 2026 W. Sol",
-      "fileName": "Gosford 2026 w. sol.pdf",
-      "ext": "pdf",
-      "kind": "document",
-      "year": "Year 11",
-      "topic": "Mixed revision — all topics",
-      "category": "Practice questions",
-      "description": "",
-      "owner": "peter82",
-      "department": "Mathematics",
-      "keywords": [],
-      "addedAt": "2026-10-04T14:13:22.359Z",
-      "bytes": 2530540,
-      "downloads": 4,
-      "lastDownloadAt": "2026-10-04T17:14:14Z",
-      "visible": true,
-      "visibility": "all",
-      "path": "resources/Year 11/Gosford 2026 w. sol.pdf",
       "source": "cloud",
       "published": true
     }
