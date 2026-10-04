@@ -499,8 +499,16 @@ console.log('6. offline queue cools down instead of hammering the backend');
   }
   check('the cooldown doubles', steps.slice(0, 3).join(',') === '60000,120000,240000', steps);
   check('and stops at 5 minutes', steps[steps.length - 1] === 300000, steps);
-  check('the cooldown is jittered, not a fixed deadline',
-    w.state.sync.cooldownUntil - Date.now() < w.state.sync.cooldownMs);
+  // Pin the jitter source so this assertion is deterministic: the implementation
+  // applies a 0.5–1.5 multiplier, and 0.25 should produce a 0.75 multiplier.
+  w.Math.random = () => 0.25;
+  w.state.sync.cooldownUntil = 0;
+  await w.syncQueueFlush();
+  const jitteredRemaining = w.state.sync.cooldownUntil - Date.now();
+  const expectedJitteredRemaining = w.state.sync.cooldownMs * 0.75;
+  check('the cooldown applies the expected bounded jitter',
+    Math.abs(jitteredRemaining - expectedJitteredRemaining) < 1000,
+    { jitteredRemaining, expectedJitteredRemaining });
 }
 {
   // Once the backend answers, the queue drains and the cooldown clears.
