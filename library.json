@@ -1,7 +1,7 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T18:09:44.661Z",
+  "updatedAt": "2026-10-04T18:12:32.229Z",
   "resources": [
     {
       "id": "res_muu4yb47bq348b",
@@ -23,6 +23,29 @@
       "visible": true,
       "visibility": "all",
       "path": "resources/Year 12/Sydney Boys 2026 w. sol.pdf",
+      "source": "cloud",
+      "published": true
+    },
+    {
+      "id": "res_muu51wevgt1kmw",
+      "title": "Mini apps",
+      "fileName": "MathsAdvanced_MCQ_Revision.html",
+      "ext": "html",
+      "kind": "app",
+      "year": "Year 11",
+      "topic": "Mixed revision — all topics",
+      "category": "Revision questions",
+      "description": "",
+      "owner": "peter82",
+      "department": "Mathematics",
+      "keywords": [],
+      "addedAt": "2026-10-04T18:12:32.215Z",
+      "bytes": 692236,
+      "downloads": 0,
+      "lastDownloadAt": null,
+      "visible": true,
+      "visibility": "all",
+      "path": "resources/Year 11/MathsAdvanced_MCQ_Revision.html",
       "source": "cloud",
       "published": true
     }
