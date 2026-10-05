@@ -1,7 +1,7 @@
 {
   "_comment": "Mathematics Advanced subject cloud — resource list written by the admin upload page. Do not hand-edit unless you know what you are doing.",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-05T12:30:27.606Z",
+  "updatedAt": "2026-10-05T12:30:33.479Z",
   "resources": [
     {
       "id": "res_muu4yb47bq348b",
@@ -46,29 +46,6 @@
       "visible": true,
       "visibility": "all",
       "path": "resources/Year 11/attendance_sheet.pdf",
-      "source": "cloud",
-      "published": true
-    },
-    {
-      "id": "res_muu5f8vk7v0o61",
-      "title": "Sample Quiz",
-      "fileName": "sample-quiz.html",
-      "ext": "html",
-      "kind": "app",
-      "year": "Year 11",
-      "topic": "Mixed revision — all topics",
-      "category": "Practice questions",
-      "description": "",
-      "owner": "peter82",
-      "department": "Mathematics",
-      "keywords": [],
-      "addedAt": "2026-10-04T18:22:50.283Z",
-      "bytes": 2391,
-      "downloads": 1,
-      "lastDownloadAt": "2026-10-04T18:35:22Z",
-      "visible": true,
-      "visibility": "all",
-      "path": "resources/Year 11/sample-quiz.html",
       "source": "cloud",
       "published": true
     },
