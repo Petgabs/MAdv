@@ -2,23 +2,23 @@
   "_comment": "Mirror of the shared backend (Supabase), written automatically by .github/workflows/cloud-sync.yml. Public: holds names, usernames and counts, never passwords.",
   "source": "shared-backend",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-04T21:35:49Z",
+  "updatedAt": "2026-10-05T16:08:25Z",
   "counters": {
-    "day": "2026-10-05",
+    "day": "2026-10-06",
     "daily": {
       "2026-10-04": {
         "visits": 11,
         "downloads": 15
       },
       "2026-10-05": {
-        "visits": 9,
-        "downloads": 28
+        "visits": 10,
+        "downloads": 33
       }
     },
-    "visits": 20,
-    "downloads": 43,
-    "visitsToday": 9,
-    "downloadsToday": 28,
+    "visits": 21,
+    "downloads": 48,
+    "visitsToday": 0,
+    "downloadsToday": 0,
     "uniqueVisitors": 5
   },
   "students": [
@@ -63,9 +63,31 @@
       "registeredAt": "2026-10-04T15:51:00Z",
       "downloadCount": 9,
       "passwordRule": "username + year number (kept in the shared backend)"
+    },
+    {
+      "id": "d1ca5c89-412c-4f94-8844-d781756e9260",
+      "year": "Year 12",
+      "notes": "",
+      "status": "active",
+      "clientId": "stu_muvb34djf50sk3",
+      "username": "van",
+      "firstName": "Van",
+      "lastVisit": "2026-10-05T13:50:12Z",
+      "visitCount": 0,
+      "registeredAt": "2026-10-05T13:49:16Z",
+      "downloadCount": 4,
+      "passwordRule": "username + year number (kept in the shared backend)"
     }
   ],
   "logins": [
+    {
+      "at": "2026-10-05T13:49:16Z",
+      "ok": true,
+      "kind": "Registration",
+      "name": "Van",
+      "year": "Year 12",
+      "studentId": "stu_muvb34djf50sk3"
+    },
     {
       "at": "2026-10-04T18:32:19Z",
       "ok": true,
@@ -220,6 +242,71 @@
     }
   ],
   "downloads": [
+    {
+      "at": "2026-10-05T13:50:12Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced MCQ Revision (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Revision questions",
+      "fileName": "Year_12_Mathematics_Advanced_MCQ_Revision (2).html",
+      "studentId": "stu_muvb34djf50sk3",
+      "resourceId": "res_muv4xdu77w9yxf",
+      "resourceKey": "path:resources/Year 12/Year_12_Mathematics_Advanced_MCQ_Revision (2).html",
+      "studentName": "Van",
+      "studentYear": "Year 12"
+    },
+    {
+      "at": "2026-10-05T13:50:07Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_muvb34djf50sk3",
+      "resourceId": "res_muu4yb47bq348b",
+      "resourceKey": "path:resources/Year 12/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "Van",
+      "studentYear": "Year 12"
+    },
+    {
+      "at": "2026-10-05T13:50:07Z",
+      "year": "Year 12",
+      "title": "Year 12 Mathematics Advanced Topic MCQ Practice (1) (2)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Sydney Boys 2026 w. sol.pdf",
+      "studentId": "stu_muvb34djf50sk3",
+      "resourceId": "res_muu4yb47bq348b",
+      "resourceKey": "path:resources/Year 12/Sydney Boys 2026 w. sol.pdf",
+      "studentName": "Van",
+      "studentYear": "Year 12"
+    },
+    {
+      "at": "2026-10-05T13:49:55Z",
+      "year": "Year 11",
+      "title": "MathsAdvanced MCQ Revision",
+      "topic": "Mixed revision — all topics",
+      "category": "Revision questions",
+      "fileName": "MathsAdvanced_MCQ_Revision.html",
+      "studentId": "stu_muvb34djf50sk3",
+      "resourceId": "res_muv4xdu73obodw",
+      "resourceKey": "path:resources/Year 11/MathsAdvanced_MCQ_Revision.html",
+      "studentName": "Van",
+      "studentYear": "Year 12"
+    },
+    {
+      "at": "2026-10-05T10:57:33Z",
+      "year": "Year 11",
+      "title": "Teacher Schedule App (7)",
+      "topic": "Mixed revision — all topics",
+      "category": "Practice questions",
+      "fileName": "Teacher_Schedule_App (7).html",
+      "studentId": null,
+      "resourceId": "res_muu5z4u5j4776y",
+      "resourceKey": "path:resources/Year 11/Teacher_Schedule_App (7).html",
+      "studentName": "Guest",
+      "studentYear": null
+    },
     {
       "at": "2026-10-04T18:39:37Z",
       "year": "Year 11",
@@ -781,6 +868,12 @@
     }
   ],
   "visits": [
+    {
+      "at": "2026-10-05T13:50:32Z",
+      "name": "Visitor",
+      "year": null,
+      "studentId": null
+    },
     {
       "at": "2026-10-04T18:39:56Z",
       "name": "Liam",
