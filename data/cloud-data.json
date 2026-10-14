@@ -2,9 +2,9 @@
   "_comment": "Mirror of the shared backend (Supabase), written automatically by .github/workflows/cloud-sync.yml. Public: holds names, usernames and counts, never passwords.",
   "source": "shared-backend",
   "subject": "Mathematics Advanced",
-  "updatedAt": "2026-10-13T17:38:42Z",
+  "updatedAt": "2026-10-14T13:48:34Z",
   "counters": {
-    "day": "2026-10-14",
+    "day": "2026-10-15",
     "daily": {
       "2026-10-04": {
         "visits": 11,
